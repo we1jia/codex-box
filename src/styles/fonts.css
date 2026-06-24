@@ -1,0 +1,15 @@
+/**
+ * Codex Box 全局字体加载入口
+ *
+ * 策略:
+ * - 英文 / 等宽走 Inter Variable + JetBrains Mono Variable,按 unicode-range 切片加载。
+ * - 中文走思源黑体 SC (Noto Sans SC) 400 + 500 + 思源宋体 SC (Noto Serif SC) 600,
+ *   同样按 unicode-range 切片,浏览器按字符自动 fallback。
+ * - 所有字体都来自本地 node_modules (fontsource),不走 CDN,离线可用。
+ */
+
+@import "@fontsource-variable/inter/wght.css";
+@import "@fontsource-variable/jetbrains-mono/wght.css";
+@import "@fontsource/noto-sans-sc/400.css";
+@import "@fontsource/noto-sans-sc/500.css";
+@import "@fontsource/noto-serif-sc/600.css";

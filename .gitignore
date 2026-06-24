@@ -1,0 +1,39 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build
+dist/
+target/
+
+# typescript build info
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/
+
+# IDE
+.claude/
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# env
+.env
+.env.local
+.env.*.local
+
+# backups
+*.bak
+*.tmp

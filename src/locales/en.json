@@ -1,0 +1,312 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "profiles": "Profiles",
+    "providers": "Providers",
+    "gateway": "Gateway",
+    "mcp": "MCP Servers",
+    "network": "Network",
+    "config_diff": "Config Diff",
+    "diagnostics": "Diagnostics",
+    "settings": "Settings"
+  },
+  "sidebar": {
+    "newChat": "New Config",
+    "connectedVersion": "connected · {{version}}",
+    "proactiveMode": "Proactive mode",
+    "expand": "Expand sidebar",
+    "collapse": "Collapse sidebar",
+    "toggle": "Toggle sidebar",
+    "resize": "Sidebar width {{width}}px, draggable between {{min}} and {{max}}px"
+  },
+  "header": {
+    "searchHint": "Search",
+    "settings": "Settings"
+  },
+  "status": {
+    "ok": "OK",
+    "warn": "Warn",
+    "fail": "Fail",
+    "idle": "Idle",
+    "running": "Running"
+  },
+  "common": {
+    "enabled": "Enabled",
+    "disabled": "Disabled",
+    "none": "None",
+    "notTested": "Not tested",
+    "redacted": "Redacted"
+  },
+  "actions": {
+    "newProfile": "New Profile",
+    "setActive": "Set Active",
+    "duplicate": "Duplicate",
+    "delete": "Delete",
+    "confirmDelete": "Confirm",
+    "addProvider": "Add Provider",
+    "testConnection": "Test Connection",
+    "copyConfig": "Copy Config",
+    "previewDiff": "Preview Diff",
+    "importPreset": "Import Preset",
+    "start": "Start",
+    "stop": "Stop",
+    "openLogs": "Open Logs",
+    "addMcp": "Add MCP",
+    "disable": "Disable",
+    "enable": "Enable",
+    "test": "Test",
+    "newRoute": "New Route",
+    "testConnectivity": "Test Connectivity",
+    "saveSafely": "Safe Save",
+    "copyDiff": "Copy Diff",
+    "prepareRollback": "Prepare Rollback",
+    "running": "Running",
+    "rerunAll": "Rerun All",
+    "switchLanguage": "Switch Language",
+    "cancel": "Cancel",
+    "create": "Create"
+  },
+  "summary": {
+    "totalProfiles": "Profiles",
+    "activeProfile": "Active Profile",
+    "safeWrites": "Safe Writes",
+    "checks": "Checks",
+    "warnings": "Warnings",
+    "report": "Report"
+  },
+  "fields": {
+    "kind": "Kind",
+    "models": "Models",
+    "status": "Status",
+    "adapter": "Adapter",
+    "health": "Health",
+    "logPath": "Log Path",
+    "transport": "Transport",
+    "enabled": "Enabled",
+    "target": "Target",
+    "latency": "Latency",
+    "name": "Name",
+    "envKey": "Environment variable"
+  },
+  "providerKind": {
+    "subscription": "Official subscription",
+    "official_api": "OpenAI official API",
+    "compatible_api": "OpenAI-compatible API",
+    "local_gateway": "Local gateway"
+  },
+  "networkKind": {
+    "direct": "Direct",
+    "http_proxy": "HTTP proxy",
+    "socks_proxy": "SOCKS proxy",
+    "clash_profile": "Clash/Mihomo profile"
+  },
+  "pages": {
+    "profiles": {
+      "title": "Profiles",
+      "subtitle": "The working-mode entry point. A profile switches model, provider, network, MCP, and safety policy together.",
+      "listTitle": "Profiles",
+      "detailTitle": "Profile Detail"
+    },
+    "providers": {
+      "title": "Providers",
+      "subtitle": "Manage model sources. Subscription, official API, compatible API, and local gateway stay separated to avoid auth conflicts.",
+      "listTitle": "Providers",
+      "detailTitle": "Provider Detail",
+      "createTitle": "Add Provider",
+      "createHint": "This only updates frontend state and does not write config.toml. Enter an environment variable name, never a raw API key."
+    },
+    "gateway": {
+      "title": "Gateway",
+      "subtitle": "Manage local gateway presets, runtime status, ports, logs, and protocol adapters. OpenCodex, codex-proxy, and CLIProxyAPI plug in here later.",
+      "presetsTitle": "Gateway Presets",
+      "runtimeTitle": "Runtime"
+    },
+    "mcp": {
+      "title": "MCP Servers",
+      "subtitle": "Manage Codex tools. Check command/url, enabled state, and env references without exposing secrets.",
+      "listTitle": "Servers",
+      "detailTitle": "Server Detail"
+    },
+    "network": {
+      "title": "Network",
+      "subtitle": "Manage Codex Box routes for config and diagnostics only. It does not take over the system proxy.",
+      "routesTitle": "Routes",
+      "testTitle": "Connectivity"
+    },
+    "configDiff": {
+      "title": "Config Diff",
+      "subtitle": "Every write must create a backup, show a diff, then use atomic write. This page demonstrates the flow and does not write config yet.",
+      "flowTitle": "Write Flow",
+      "diffTitle": "Diff Preview"
+    },
+    "diagnostics": {
+      "title": "Diagnostics",
+      "subtitle": "Grouped checks for config, provider, network, MCP, backup, auth, and gateway with a redacted report."
+    },
+    "settings": {
+      "title": "Settings",
+      "subtitle": "App-level settings for language, theme, safety policy, backup retention, log redaction, and experiments.",
+      "sectionsTitle": "Sections"
+    }
+  },
+  "diffFlow": {
+    "draft": {
+      "title": "Draft",
+      "desc": "All edits enter a draft first"
+    },
+    "backup": {
+      "title": "Backup",
+      "desc": "Save the original config before write"
+    },
+    "diff": {
+      "title": "Review Diff",
+      "desc": "Show inserts, deletes, and changes"
+    },
+    "ready": {
+      "title": "Atomic Write",
+      "desc": "Write tmp first, then rename"
+    }
+  },
+  "diagnostics": {
+    "groups": {
+      "config": "Config",
+      "provider": "Provider / Auth",
+      "gateway": "Gateway",
+      "mcp": "MCP",
+      "backup": "Backup"
+    },
+    "items": {
+      "syntax": "TOML syntax",
+      "profileRefs": "Profile refs",
+      "providerUrl": "Provider URL",
+      "authEnv": "API key env",
+      "gatewayHealth": "Gateway health",
+      "port": "Port usage",
+      "mcpCommand": "MCP command",
+      "mcpEnv": "MCP env refs",
+      "backupDir": "Backup directory",
+      "atomicWrite": "Atomic write"
+    }
+  },
+  "settings": {
+    "sections": {
+      "general": "General",
+      "security": "Security",
+      "backup": "Backup",
+      "logs": "Logs",
+      "experiments": "Experiments"
+    },
+    "sectionDesc": {
+      "general": "Language, theme, and startup behavior",
+      "security": "Write confirmation and secret masking",
+      "backup": "Backups, retention, and rollback",
+      "logs": "Log size, redaction, and reports",
+      "experiments": "Gateway presets and plugin entry points"
+    },
+    "options": {
+      "language": { "label": "Language", "desc": "Follow the current interface language and switch anytime." },
+      "theme": { "label": "Theme", "desc": "Keep the light Mac Dashboard direction. Dark mode will be added later." },
+      "startupCheck": { "label": "Startup check", "desc": "Read config and refresh the Dashboard summary on launch." },
+      "requireDiff": { "label": "Require diff before write", "desc": "Every save action must go through Config Diff first." },
+      "maskSecrets": { "label": "Mask secrets", "desc": "API keys, tokens, and passwords never appear in UI or logs." },
+      "confirmDanger": { "label": "Confirm dangerous actions", "desc": "Delete, rollback, and overwrite actions require confirmation." },
+      "backupFirst": { "label": "Backup before write", "desc": "Create a backup record before changing config." },
+      "retention": { "label": "Backup retention", "desc": "Keep up to 50 backups by default; settings will be editable later." },
+      "rollback": { "label": "Protected rollback", "desc": "Rollback also backs up the current state first." },
+      "redaction": { "label": "Log redaction", "desc": "Diagnostics keep route, status, and latency summaries only." },
+      "maxSize": { "label": "Log size limit", "desc": "Rotate logs when they reach the configured limit." },
+      "exportReport": { "label": "Export diagnostic report", "desc": "Reports are redacted by default and safe to copy." },
+      "gatewayPresets": { "label": "Gateway presets", "desc": "Enable OpenCodex, codex-proxy, and CLIProxyAPI preset entry points." },
+      "pluginDirs": { "label": "External plugin directories", "desc": "Disabled by default. Only explicitly trusted directories are allowed." },
+      "desktopScan": { "label": "Codex Desktop detection", "desc": "Read-only install detection without modifying internal files." }
+    }
+  },
+  "feedback": {
+    "profileCreate": "Profile creation draft opened.",
+    "profileActivated": "{{name}} is marked active in the demo state.",
+    "profileCopied": "Copied the structure for {{name}}.",
+    "dangerBlocked": "Dangerous action blocked. Real deletion must go through diff and backup.",
+    "providerCreate": "Provider creation draft opened.",
+    "providerCreated": "{{name}} was added to the local list. It has not been written to config.",
+    "providerFormInvalid": "Fill in name, base_url, environment variable, and at least one model.",
+    "providerSecretRejected": "Do not paste a raw secret here. Use an environment variable name such as OPENROUTER_API_KEY.",
+    "connectionTested": "{{name}} connection test completed (mock).",
+    "providerCopied": "Copied provider config for {{name}}.",
+    "previewDiff": "Config Diff preview is ready.",
+    "gatewayPreset": "Gateway preset import flow opened.",
+    "gatewayStarted": "{{name}} is running in frontend state.",
+    "gatewayStopped": "{{name}} stopped in frontend state.",
+    "openLogs": "Log entry is ready; real log reading will be wired later.",
+    "mcpCreate": "MCP creation draft opened.",
+    "mcpToggled": "{{name}} enabled state updated in frontend state.",
+    "mcpTested": "{{name}} test completed (mock).",
+    "routeCreate": "Route creation draft opened.",
+    "networkTested": "{{name}} connectivity test completed: {{ms}} ms.",
+    "writeBlocked": "Safe save blocked: real writes require backup + diff + atomic write.",
+    "diffCopied": "Diff copy flow completed (mock).",
+    "rollbackConfirm": "Rollback entered confirmation state and will not overwrite config directly.",
+    "diagnosticsDone": "Diagnostics completed. {{total}} checks reviewed.",
+    "languageChanged": "Interface language switched.",
+    "settingUpdated": "Setting updated in frontend state."
+  },
+  "dashboard": {
+    "greeting": {
+      "dawn": "Good late night",
+      "morning": "Good morning",
+      "afternoon": "Good afternoon",
+      "evening": "Good evening"
+    },
+    "greetingSuffix": ", developer",
+    "loadError": "Load failed: {{msg}}",
+    "loading": "Loading config...",
+    "statusOk": "Codex config looks healthy · Last backup 2 minutes ago · {{time}}",
+    "buttons": {
+      "daily": "Daily",
+      "settings": "Settings",
+      "recheck": "Recheck",
+      "viewAll": "View all →"
+    }
+  },
+  "metric": {
+    "activeProfile": { "label": "ACTIVE PROFILE", "sub": "current profile / model" },
+    "provider": { "label": "PROVIDER", "sub": "model_provider config", "value": "{{count}}" },
+    "network": { "label": "NETWORK", "sub": "network route" },
+    "mcp": { "label": "MCP", "sub": "mcp_servers" }
+  },
+  "health": {
+    "title": "Config Health",
+    "items": {
+      "syntax": "Config syntax",
+      "providerUrl": "Provider URL",
+      "auth": "Auth status",
+      "network": "Network direct",
+      "mcpFs": "MCP filesystem",
+      "backupSpace": "Backup storage"
+    },
+    "ms": {
+      "syntax": "12 ms",
+      "providerUrl": "412 ms",
+      "network": "280 ms",
+      "auth": "key exists",
+      "mcpFs": "ready",
+      "backupSpace": "1.2 GB free"
+    }
+  },
+  "activity": {
+    "title": "Recent Activity",
+    "items": {
+      "backupDev": "Backed up dev profile",
+      "switchProvider": "Switched provider → openai",
+      "enableMcp": "Enabled mcp: filesystem",
+      "switchRoute": "Switched network route"
+    }
+  },
+  "lang": {
+    "zh": "中文",
+    "en": "English",
+    "switch": "Switch language"
+  },
+  "placeholders": {
+    "providerName": "For example, OpenRouter Dev"
+  }
+}

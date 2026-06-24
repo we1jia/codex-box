@@ -1,0 +1,12 @@
+# 含 marketplaces
+model = "gpt-5.5"
+
+[marketplaces.openai-bundled]
+last_updated = "2026-06-24T01:22:11Z"
+source_type = "local"
+source = "/Users/liuweijia/.codex/.tmp/bundled-marketplaces/openai-bundled"
+
+[marketplaces.agentmemory]
+last_updated = "2026-06-12T06:43:33Z"
+source_type = "git"
+source = "https://github.com/rohitg00/agentmemory.git"

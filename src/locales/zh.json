@@ -1,0 +1,312 @@
+{
+  "nav": {
+    "dashboard": "仪表盘",
+    "profiles": "工作配置",
+    "providers": "模型来源",
+    "gateway": "本地网关",
+    "mcp": "MCP 服务",
+    "network": "网络路由",
+    "config_diff": "配置变更",
+    "diagnostics": "诊断检查",
+    "settings": "设置"
+  },
+  "sidebar": {
+    "newChat": "新建配置",
+    "connectedVersion": "已连接 · {{version}}",
+    "proactiveMode": "主动模式",
+    "expand": "展开侧边栏",
+    "collapse": "收起侧边栏",
+    "toggle": "切换边栏",
+    "resize": "侧边栏宽度 {{width}}px，可在 {{min}}~{{max}}px 之间拖拽调整"
+  },
+  "header": {
+    "searchHint": "搜索",
+    "settings": "设置"
+  },
+  "status": {
+    "ok": "正常",
+    "warn": "注意",
+    "fail": "失败",
+    "idle": "待配置",
+    "running": "运行中"
+  },
+  "common": {
+    "enabled": "已启用",
+    "disabled": "已禁用",
+    "none": "无",
+    "notTested": "未测试",
+    "redacted": "已脱敏"
+  },
+  "actions": {
+    "newProfile": "新建工作配置",
+    "setActive": "设为当前",
+    "duplicate": "复制",
+    "delete": "删除",
+    "confirmDelete": "再次确认",
+    "addProvider": "添加模型来源",
+    "testConnection": "测试连接",
+    "copyConfig": "复制配置",
+    "previewDiff": "预览变更",
+    "importPreset": "导入预设",
+    "start": "启动",
+    "stop": "停止",
+    "openLogs": "查看日志",
+    "addMcp": "添加 MCP",
+    "disable": "禁用",
+    "enable": "启用",
+    "test": "测试",
+    "newRoute": "新建路由",
+    "testConnectivity": "测试连通性",
+    "saveSafely": "安全保存",
+    "copyDiff": "复制变更",
+    "prepareRollback": "准备回滚",
+    "running": "检查中",
+    "rerunAll": "全部重跑",
+    "switchLanguage": "切换语言",
+    "cancel": "取消",
+    "create": "创建"
+  },
+  "summary": {
+    "totalProfiles": "工作配置数",
+    "activeProfile": "当前配置",
+    "safeWrites": "安全写入",
+    "checks": "检查项",
+    "warnings": "警告",
+    "report": "报告"
+  },
+  "fields": {
+    "kind": "类型",
+    "models": "模型",
+    "status": "状态",
+    "adapter": "适配器",
+    "health": "健康检查",
+    "logPath": "日志路径",
+    "transport": "传输",
+    "enabled": "启用状态",
+    "target": "目标",
+    "latency": "延迟",
+    "name": "名称",
+    "envKey": "环境变量"
+  },
+  "providerKind": {
+    "subscription": "官方订阅",
+    "official_api": "OpenAI 官方 API",
+    "compatible_api": "OpenAI 兼容 API",
+    "local_gateway": "本地网关"
+  },
+  "networkKind": {
+    "direct": "直连",
+    "http_proxy": "HTTP 代理",
+    "socks_proxy": "SOCKS 代理",
+    "clash_profile": "Clash/Mihomo 配置"
+  },
+  "pages": {
+    "profiles": {
+      "title": "工作配置",
+      "subtitle": "工作模式入口。用户切换的是一组完整配置：模型、模型来源、网络、MCP 和安全策略一起切换。",
+      "listTitle": "配置列表",
+      "detailTitle": "配置详情"
+    },
+    "providers": {
+      "title": "模型来源",
+      "subtitle": "管理模型来源。订阅、官方 API、第三方兼容 API、本地网关分开建模，避免认证混用。",
+      "listTitle": "来源列表",
+      "detailTitle": "来源详情",
+      "createTitle": "新增模型来源",
+      "createHint": "这里只保存到前端状态，不会写入 config.toml。API key 只能填写环境变量名，不能填写明文密钥。"
+    },
+    "gateway": {
+      "title": "本地网关",
+      "subtitle": "管理本地网关预设、运行状态、端口、日志和协议适配。OpenCodex、codex-proxy、CLIProxyAPI 后续在这里接入。",
+      "presetsTitle": "网关预设",
+      "runtimeTitle": "运行状态"
+    },
+    "mcp": {
+      "title": "MCP 服务",
+      "subtitle": "管理 Codex 可用工具。重点检查 command/url、启用状态和 env 引用，secret 不明文展示。",
+      "listTitle": "服务列表",
+      "detailTitle": "服务详情"
+    },
+    "network": {
+      "title": "网络路由",
+      "subtitle": "管理 Codex Box 的网络路由，只作用于配置和诊断，不接管系统全局代理。",
+      "routesTitle": "路由列表",
+      "testTitle": "连通性测试"
+    },
+    "configDiff": {
+      "title": "配置变更",
+      "subtitle": "所有写入都必须先备份、再展示变更、最后原子写入。当前页面只演示安全流程，不直接写配置。",
+      "flowTitle": "写入流程",
+      "diffTitle": "变更预览"
+    },
+    "diagnostics": {
+      "title": "诊断检查",
+      "subtitle": "按配置、模型来源、网络、MCP、备份、认证和网关分组，生成可复制的脱敏诊断报告。"
+    },
+    "settings": {
+      "title": "设置",
+      "subtitle": "应用级设置：语言、主题、安全策略、备份保留、日志脱敏和实验功能。",
+      "sectionsTitle": "设置分类"
+    }
+  },
+  "diffFlow": {
+    "draft": {
+      "title": "编辑草稿",
+      "desc": "所有改动先进入草稿区"
+    },
+    "backup": {
+      "title": "创建备份",
+      "desc": "写入前保存原始 config"
+    },
+    "diff": {
+      "title": "确认变更",
+      "desc": "展示新增、删除和变更"
+    },
+    "ready": {
+      "title": "原子写入",
+      "desc": "tmp 写入成功后 rename"
+    }
+  },
+  "diagnostics": {
+    "groups": {
+      "config": "配置",
+      "provider": "模型来源 / 认证",
+      "gateway": "网关",
+      "mcp": "MCP",
+      "backup": "备份"
+    },
+    "items": {
+      "syntax": "TOML 语法",
+      "profileRefs": "配置引用",
+      "providerUrl": "来源 URL",
+      "authEnv": "API key 环境变量",
+      "gatewayHealth": "网关健康检查",
+      "port": "端口占用",
+      "mcpCommand": "MCP command",
+      "mcpEnv": "MCP env 引用",
+      "backupDir": "备份目录",
+      "atomicWrite": "原子写入"
+    }
+  },
+  "settings": {
+    "sections": {
+      "general": "通用",
+      "security": "安全",
+      "backup": "备份",
+      "logs": "日志",
+      "experiments": "实验功能"
+    },
+    "sectionDesc": {
+      "general": "语言、主题和启动行为",
+      "security": "写入确认和 secret 脱敏",
+      "backup": "备份、保留和回滚",
+      "logs": "日志大小、脱敏和报告",
+      "experiments": "网关预设和插件入口"
+    },
+    "options": {
+      "language": { "label": "语言", "desc": "跟随当前界面语言，可随时切换。" },
+      "theme": { "label": "主题", "desc": "保持浅色 Mac 仪表盘风格，深色模式后续接入。" },
+      "startupCheck": { "label": "启动时检查", "desc": "启动后读取 config 并刷新仪表盘摘要。" },
+      "requireDiff": { "label": "写入前强制确认变更", "desc": "任何保存动作都必须先进入配置变更页。" },
+      "maskSecrets": { "label": "Secret 脱敏", "desc": "API key、token 和密码不在 UI 或日志中明文展示。" },
+      "confirmDanger": { "label": "危险操作二次确认", "desc": "删除、回滚、覆盖配置前必须再次确认。" },
+      "backupFirst": { "label": "写入前备份", "desc": "修改 config 前自动生成备份记录。" },
+      "retention": { "label": "备份保留策略", "desc": "默认最多保留 50 个备份，后续支持设置。" },
+      "rollback": { "label": "回滚保护", "desc": "回滚前也会先备份当前状态。" },
+      "redaction": { "label": "日志脱敏", "desc": "诊断日志只保留 route、状态和耗时等摘要。" },
+      "maxSize": { "label": "日志大小限制", "desc": "日志文件达到上限后轮转，避免无限增长。" },
+      "exportReport": { "label": "导出诊断报告", "desc": "报告默认脱敏，可复制给自己排查。" },
+      "gatewayPresets": { "label": "网关预设", "desc": "启用 OpenCodex、codex-proxy、CLIProxyAPI 的预设入口。" },
+      "pluginDirs": { "label": "外部插件目录", "desc": "默认关闭，后续只允许显式信任的目录。" },
+      "desktopScan": { "label": "Codex Desktop 检测", "desc": "只读检测安装路径，不修改内部文件。" }
+    }
+  },
+  "feedback": {
+    "profileCreate": "已打开工作配置创建流程草稿。",
+    "profileActivated": "{{name}} 已标记为当前配置（演示状态，尚未写入）。",
+    "profileCopied": "已复制 {{name}} 的配置结构。",
+    "dangerBlocked": "危险操作已拦截。真实删除必须先进入变更确认和备份流程。",
+    "providerCreate": "已打开模型来源创建流程草稿。",
+    "providerCreated": "{{name}} 已添加到本地列表（尚未写入配置文件）。",
+    "providerFormInvalid": "请填写名称、base_url、环境变量和至少一个模型。",
+    "providerSecretRejected": "这里不能填写明文密钥，请只填写环境变量名，例如 OPENROUTER_API_KEY。",
+    "connectionTested": "{{name}} 连接测试已完成（模拟）。",
+    "providerCopied": "已复制 {{name}} 的模型来源配置。",
+    "previewDiff": "已准备跳转到配置变更预览。",
+    "gatewayPreset": "已打开网关预设导入流程。",
+    "gatewayStarted": "{{name}} 已进入运行中状态（前端模拟）。",
+    "gatewayStopped": "{{name}} 已停止（前端模拟）。",
+    "openLogs": "日志入口已就绪，后续会接入真实日志读取。",
+    "mcpCreate": "已打开 MCP 创建流程草稿。",
+    "mcpToggled": "{{name}} 的启用状态已更新（前端模拟）。",
+    "mcpTested": "{{name}} 测试完成（模拟）。",
+    "routeCreate": "已打开路由创建流程草稿。",
+    "networkTested": "{{name}} 连通性测试完成：{{ms}} ms。",
+    "writeBlocked": "安全保存已拦截：真实写入必须接入备份、变更确认和原子写入。",
+    "diffCopied": "变更内容已复制到剪贴板流程（模拟）。",
+    "rollbackConfirm": "回滚已进入确认状态，不会直接覆盖配置。",
+    "diagnosticsDone": "诊断完成，共检查 {{total}} 项。",
+    "languageChanged": "界面语言已切换。",
+    "settingUpdated": "设置已更新（前端状态）。"
+  },
+  "dashboard": {
+    "greeting": {
+      "dawn": "凌晨好",
+      "morning": "早上好",
+      "afternoon": "下午好",
+      "evening": "晚安"
+    },
+    "greetingSuffix": "，开发者",
+    "loadError": "读取失败：{{msg}}",
+    "loading": "正在加载配置…",
+    "statusOk": "当前 Codex 配置一切正常 · 最近备份 2 分钟前 · {{time}}",
+    "buttons": {
+      "daily": "今日摘要",
+      "settings": "设置",
+      "recheck": "重新检查",
+      "viewAll": "查看全部 →"
+    }
+  },
+  "metric": {
+    "activeProfile": { "label": "当前配置", "sub": "当前配置 / model" },
+    "provider": { "label": "模型来源", "sub": "model_provider 配置", "value": "{{count}} 个" },
+    "network": { "label": "网络", "sub": "网络路由" },
+    "mcp": { "label": "MCP", "sub": "mcp_servers" }
+  },
+  "health": {
+    "title": "配置健康",
+    "items": {
+      "syntax": "配置文件语法",
+      "providerUrl": "来源 URL",
+      "auth": "认证状态",
+      "network": "网络直连",
+      "mcpFs": "MCP filesystem",
+      "backupSpace": "备份目录空间"
+    },
+    "ms": {
+      "syntax": "12 ms",
+      "providerUrl": "412 ms",
+      "network": "280 ms",
+      "auth": "key 已配置",
+      "mcpFs": "就绪",
+      "backupSpace": "剩余 1.2 GB"
+    }
+  },
+  "activity": {
+    "title": "最近活动",
+    "items": {
+      "backupDev": "备份 dev 配置",
+      "switchProvider": "切换模型来源 → openai",
+      "enableMcp": "启用 mcp: filesystem",
+      "switchRoute": "切换网络路由"
+    }
+  },
+  "lang": {
+    "zh": "中文",
+    "en": "English",
+    "switch": "切换语言"
+  },
+  "placeholders": {
+    "providerName": "例如 OpenRouter Dev"
+  }
+}
