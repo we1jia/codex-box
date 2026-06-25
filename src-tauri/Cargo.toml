@@ -26,8 +26,17 @@ thiserror = "1"
 anyhow = "1"
 similar = "2"
 dirs = "5"
-tokio = { version = "1", features = ["fs", "io-util"] }
+tokio = { version = "1", features = ["fs", "io-util", "rt-multi-thread", "macros", "sync", "time", "net"] }
 uuid = { version = "1", features = ["v4"] }
+
+# Codex Box 本地代理 runtime (BYOK 真链路)
+axum = { version = "0.7", features = ["macros"] }
+tower = "0.5"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "json"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+bytes = "1"
+futures = "0.3"
 
 [profile.release]
 panic = "abort"

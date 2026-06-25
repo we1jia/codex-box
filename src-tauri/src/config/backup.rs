@@ -10,6 +10,16 @@ pub fn create_backup(
     backup_dir: &Path,
     reason: BackupReason,
 ) -> AppResult<BackupRecord> {
+    create_backup_with_extension(config_path, backup_dir, reason, "toml")
+}
+
+/// 创建备份并按 extension 选择后缀（用于 JSON 备份、纯文本备份等场景）
+pub fn create_backup_with_extension(
+    config_path: &Path,
+    backup_dir: &Path,
+    reason: BackupReason,
+    extension: &str,
+) -> AppResult<BackupRecord> {
     if !config_path.exists() {
         return Err(AppError::ConfigNotFound(config_path.display().to_string()));
     }
@@ -26,7 +36,7 @@ pub fn create_backup(
 
     let timestamp = Utc::now().format("%Y%m%dT%H%M%S").to_string();
     let short_hash = &content_hash[..8];
-    let filename = format!("codex-box-{}-{}.toml", timestamp, short_hash);
+    let filename = format!("codex-box-{}-{}.{}", timestamp, short_hash, extension);
     let dest = backup_dir.join(&filename);
 
     std::fs::write(&dest, &bytes)
@@ -62,6 +72,7 @@ mod tests {
         let rec = create_backup(src.path(), &backup_dir, BackupReason::Manual).unwrap();
 
         assert!(rec.file_path.contains("codex-box"));
+        assert!(rec.file_path.ends_with(".toml"));
         assert!(std::path::Path::new(&rec.file_path).exists());
         let copied = std::fs::read_to_string(&rec.file_path).unwrap();
         assert_eq!(copied, "original config");
@@ -97,6 +108,18 @@ mod tests {
 
         let rec = create_backup(src.path(), &backup_dir, BackupReason::Manual).unwrap();
         assert!(backup_dir.exists());
+        assert!(std::path::Path::new(&rec.file_path).exists());
+    }
+
+    #[test]
+    fn create_backup_with_extension_uses_custom_suffix() {
+        let mut src = NamedTempFile::new().unwrap();
+        src.write_all(b"{}").unwrap();
+        let dir = tempdir().unwrap();
+        let rec =
+            create_backup_with_extension(src.path(), dir.path(), BackupReason::PreWrite, "json")
+                .unwrap();
+        assert!(rec.file_path.ends_with(".json"));
         assert!(std::path::Path::new(&rec.file_path).exists());
     }
 }

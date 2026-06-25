@@ -3,3 +3,4 @@ pub mod config_snapshot;
 pub mod config_write;
 pub mod dashboard;
 pub mod opencodex;
+pub mod proxy;

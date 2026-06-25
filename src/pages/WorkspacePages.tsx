@@ -13,6 +13,7 @@ import {
   KeyRound,
   Languages,
   Network,
+  Play,
   Plus,
   Puzzle,
   RotateCcw,
@@ -22,6 +23,7 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Square,
   TestTube2,
   Trash2,
   Users,
@@ -39,12 +41,15 @@ import {
 } from "@/lib/mock-data";
 import type {
   ApplyConfigChangeResultView,
+  ApplyInjectResult,
+  ApplyRestoreResult,
   CodexRuntimeStatus,
   ConfigChangePreviewView,
   ConfigChangeRequest,
   ConfigSnapshotView,
   DiagnosticGroupView,
   DiffLineView,
+  InjectBaseUrlPreview,
   ModelCatalogEntry,
   OpenCodexCustomConfig,
   OpenCodexDeleteRequest,
@@ -53,6 +58,9 @@ import type {
   ProfileView,
   ProviderRoute,
   ProviderView,
+  ProxyModelsPreview,
+  ProxyStatusView,
+  RestoreBaseUrlPreview,
   StatusTone,
 } from "@/lib/types";
 
@@ -292,8 +300,12 @@ function SecretText({ value }: { value: string }) {
 
 function useNotice() {
   const [notice, setNotice] = useState<Notice | null>(null);
-  const show = (tone: NoticeTone, message: string) => setNotice({ tone, message });
-  return { notice, show };
+  // 必须稳定引用,否则下游 useCallback/useEffect 会死循环
+  const show = useCallback(
+    (tone: NoticeTone, message: string) => setNotice({ tone, message }),
+    []
+  );
+  return useMemo(() => ({ notice, show }), [notice, show]);
 }
 
 type ProviderDraft = {
@@ -1145,12 +1157,23 @@ export function ModelsPage() {
     setBusy(false);
     if (opencodex.ok) {
       setConfig(opencodex.data);
-      setCatalog(opencodex.data.catalog.length > 0 ? opencodex.data.catalog : mockModelCatalog);
-      setSelectedId((current) =>
-        current && opencodex.data.catalog.some((entry) => entry.modelId === current)
-          ? current
-          : (opencodex.data.catalog[0]?.modelId || mockModelCatalog[0]?.modelId || "")
-      );
+      // 仅在 valid=true 且有数据时使用真实数据; 否则清空并提示错误
+      if (opencodex.data.valid && opencodex.data.catalog.length > 0) {
+        setCatalog(opencodex.data.catalog);
+        setSelectedId((current) =>
+          current && opencodex.data.catalog.some((entry) => entry.modelId === current)
+            ? current
+            : (opencodex.data.catalog[0]?.modelId || "")
+        );
+      } else {
+        setCatalog([]);
+        setSelectedId("");
+        if (opencodex.data.parseErrors.length > 0) {
+          show("warning", opencodex.data.parseErrors[0].message);
+        } else {
+          show("info", "custom_model_catalog.json 为空,可在 Provider Routes 页添加模型");
+        }
+      }
     } else {
       show("warning", opencodex.error);
     }
@@ -1317,12 +1340,22 @@ export function ProviderRoutesPage() {
     setBusy(false);
     if (result.ok) {
       setConfig(result.data);
-      setRoutes(result.data.providers.length > 0 ? result.data.providers : mockProviderRoutes);
-      setSelectedName((current) =>
-        current && result.data.providers.some((entry) => entry.name === current)
-          ? current
-          : (result.data.providers[0]?.name || mockProviderRoutes[0]?.name || "")
-      );
+      if (result.data.valid && result.data.providers.length > 0) {
+        setRoutes(result.data.providers);
+        setSelectedName((current) =>
+          current && result.data.providers.some((entry) => entry.name === current)
+            ? current
+            : (result.data.providers[0]?.name || "")
+        );
+      } else {
+        setRoutes([]);
+        setSelectedName("");
+        if (result.data.parseErrors.length > 0) {
+          show("warning", result.data.parseErrors[0].message);
+        } else {
+          show("info", "providers.json 为空,请新增 provider");
+        }
+      }
     } else {
       show("warning", result.error);
     }
@@ -1471,120 +1504,398 @@ export function ProviderRoutesPage() {
 }
 
 /**
- * Codex Runtime 页面:Codex Desktop / CLI / ~/.opencodex/ 只读检测
- * 取代 v0.2 的"OpenCodex 检出"语义:不再有外部 OpenCodex 进程,只剩"Codex 桌面安装检测 + BYOK JSON 文件位置"。
+ * Codex Box Runtime 页面(v0.3.1 升级):
+ * 取代 v0.3 的"只读检测",升级为"本地代理 runtime 运行控制台"。
+ * - 状态:Running / Stopped / Failed
+ * - 操作:Start / Stop / Restart
+ * - 路由表:inject-map(provider → upstream base_url / env_key / wire_api / models)
+ * - /v1/models 预览:调本机代理的合并模型列表
+ * - Inject / Restore:把 [model_providers.*] base_url 改写为 127.0.0.1:port/v1,Stop 时还原
  */
 export function CodexRuntimePage() {
   const { t } = useTranslation();
   const { notice, show } = useNotice();
-  const [status, setStatus] = useState<CodexRuntimeStatus>(mockCodexRuntime);
+  const [proxy, setProxy] = useState<ProxyStatusView | null>(null);
   const [opencodex, setOpencodex] = useState<OpenCodexCustomConfig | null>(null);
+  const [codexRuntime] = useState<CodexRuntimeStatus>(mockCodexRuntime);
   const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [preview, setPreview] = useState<ProxyModelsPreview | null>(null);
+  const [injectPreview, setInjectPreview] = useState<InjectBaseUrlPreview | null>(null);
+  const [restorePreview, setRestorePreview] = useState<RestoreBaseUrlPreview | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    // 当前 MVP 阶段 codex_runtime_status 没有实现,直接展示 mock + opencodex read
-    void invokeCmd<OpenCodexCustomConfig>("opencodex_config_read").then((result) => {
-      if (result.ok) {
-        setOpencodex(result.data);
-        setStatus((current) => ({
-          ...current,
-          opencodexDir: result.data.providersPath.replace(/\/[^/]+$/, ""),
-          opencodexDirExists: true,
-        }));
-      } else {
-        show("warning", result.error);
-      }
-    });
+    const statusR = await invokeCmd<ProxyStatusView>("proxy_status");
+    if (statusR.ok) setProxy(statusR.data);
+    const ocR = await invokeCmd<OpenCodexCustomConfig>("opencodex_config_read");
+    if (ocR.ok) setOpencodex(ocR.data);
     setLoading(false);
-  }, [show]);
+  }, []);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
+  const start = useCallback(async () => {
+    setBusy(true);
+    const r = await invokeCmd<{ port: number; status: string }>("proxy_start", { request: { port: 1455 } });
+    setBusy(false);
+    if (r.ok) {
+      show("success", t("codexBoxRuntime.notice.started", { port: r.data.port }));
+      void refresh();
+    } else {
+      show("warning", r.error);
+    }
+  }, [refresh, show, t]);
+
+  const stop = useCallback(async () => {
+    setBusy(true);
+    const r = await invokeCmd<ProxyStatusView>("proxy_stop");
+    setBusy(false);
+    if (r.ok) {
+      show("success", t("codexBoxRuntime.notice.stopped"));
+      void refresh();
+    } else {
+      show("warning", r.error);
+    }
+  }, [refresh, show, t]);
+
+  const restart = useCallback(async () => {
+    setBusy(true);
+    const r = await invokeCmd<{ port: number; status: string }>("proxy_restart", { request: { port: 1455 } });
+    setBusy(false);
+    if (r.ok) {
+      show("success", t("codexBoxRuntime.notice.restarted", { port: r.data.port }));
+      void refresh();
+    } else {
+      show("warning", r.error);
+    }
+  }, [refresh, show, t]);
+
+  const modelsPreview = useCallback(async () => {
+    setBusy(true);
+    const r = await invokeCmd<ProxyModelsPreview>("proxy_models_preview");
+    setBusy(false);
+    if (r.ok) {
+      setPreview(r.data);
+      show("success", t("codexBoxRuntime.notice.previewOk"));
+    } else {
+      show("warning", r.error);
+    }
+  }, [show, t]);
+
+  const injectPreviewFn = useCallback(async () => {
+    setBusy(true);
+    const r = await invokeCmd<InjectBaseUrlPreview>("proxy_inject_base_url_preview", {
+      request: { port: proxy?.port ?? 1455 },
+    });
+    setBusy(false);
+    if (r.ok) {
+      setInjectPreview(r.data);
+    } else {
+      show("warning", r.error);
+    }
+  }, [proxy?.port, show]);
+
+  const injectApply = useCallback(async () => {
+    if (!injectPreview) return;
+    setBusy(true);
+    const r = await invokeCmd<ApplyInjectResult>("proxy_inject_base_url_apply", {
+      request: { preview: injectPreview, confirmed: true },
+    });
+    setBusy(false);
+    if (r.ok) {
+      show("success", t("codexBoxRuntime.notice.injectOk"));
+      setInjectPreview(null);
+      void refresh();
+    } else {
+      show("warning", r.error);
+    }
+  }, [injectPreview, refresh, show, t]);
+
+  const restorePreviewFn = useCallback(async () => {
+    setBusy(true);
+    const r = await invokeCmd<RestoreBaseUrlPreview>("proxy_restore_base_url_preview", {});
+    setBusy(false);
+    if (r.ok) {
+      setRestorePreview(r.data);
+    } else {
+      show("warning", r.error);
+    }
+  }, [show]);
+
+  const restoreApply = useCallback(async () => {
+    if (!restorePreview) return;
+    setBusy(true);
+    const r = await invokeCmd<ApplyRestoreResult>("proxy_restore_base_url_apply", {
+      request: { preview: restorePreview, confirmed: true },
+    });
+    setBusy(false);
+    if (r.ok) {
+      show("success", t("codexBoxRuntime.notice.restoreOk"));
+      setRestorePreview(null);
+      void refresh();
+    } else {
+      show("warning", r.error);
+    }
+  }, [refresh, restorePreview, show, t]);
+
+  const statusName = proxy?.status ?? "stopped";
+  const statusTone: StatusTone =
+    statusName === "running"
+      ? "running"
+      : statusName === "starting"
+        ? "warn"
+        : statusName === "failed"
+          ? "fail"
+          : "idle";
+  const port = proxy?.port ?? 0;
+  const canStart = statusName === "stopped" || statusName === "failed";
+  const canStop = statusName === "running" || statusName === "starting";
+
   return (
     <PageShell
-      title={t("pages.codexRuntime.title")}
-      subtitle={t("pages.codexRuntime.subtitle")}
+      title={t("codexBoxRuntime.title")}
+      subtitle={t("codexBoxRuntime.subtitle")}
       notice={notice}
       action={
-        <ToolbarButton icon={<RotateCcw size={13} />} onClick={() => void refresh()} disabled={loading}>
-          {t("actions.refresh")}
-        </ToolbarButton>
+        <div className="flex items-center gap-2">
+          <ToolbarButton icon={<RotateCcw size={13} />} onClick={() => void refresh()} disabled={loading}>
+            {t("actions.refresh")}
+          </ToolbarButton>
+          {canStart && (
+            <ToolbarButton icon={<Play size={13} />} variant="primary" onClick={() => void start()} disabled={busy}>
+              {t("codexBoxRuntime.start")}
+            </ToolbarButton>
+          )}
+          {canStop && (
+            <>
+              <ToolbarButton icon={<Square size={13} />} onClick={() => void stop()} disabled={busy}>
+                {t("codexBoxRuntime.stop")}
+              </ToolbarButton>
+              <ToolbarButton icon={<RotateCcw size={13} />} onClick={() => void restart()} disabled={busy}>
+                {t("codexBoxRuntime.restart")}
+              </ToolbarButton>
+            </>
+          )}
+        </div>
       }
     >
       <SummaryStrip
         items={[
-          { label: t("fields.desktopInstalled"), value: status.desktopInstalled ? t("common.detected") : t("common.missing"), tone: status.desktopInstalled ? "ok" : "warn" },
-          { label: t("fields.cliAvailable"), value: status.cliAvailable ? t("common.detected") : t("common.missing"), tone: status.cliAvailable ? "ok" : "warn" },
-          { label: t("fields.opencodexDir"), value: opencodex ? t("common.detected") : t("common.notFound") },
+          {
+            label: t("codexBoxRuntime.status"),
+            value: t(`codexBoxRuntime.statusName.${statusName}`),
+            tone: statusTone,
+          },
+          {
+            label: t("codexBoxRuntime.port"),
+            value: port > 0 ? String(port) : "-",
+            tone: port > 0 ? "ok" : "idle",
+          },
+          {
+            label: t("codexBoxRuntime.uptime"),
+            value:
+              proxy && proxy.uptimeMs !== null
+                ? format_uptime(proxy.uptimeMs)
+                : "-",
+            tone: statusTone,
+          },
+          {
+            label: t("codexBoxRuntime.routedProviders"),
+            value: String(proxy?.providerCount ?? 0),
+            tone: (proxy?.providerCount ?? 0) > 0 ? "ok" : "warn",
+          },
         ]}
       />
+
+      {proxy?.lastError && (
+        <div className="cb-surface border-status-fail/30 bg-status-fail/[0.06] p-4">
+          <div className="mb-1 flex items-center gap-2 text-[12px] font-medium text-status-fail">
+            <AlertTriangle size={14} /> {t("codexBoxRuntime.lastError")}
+          </div>
+          <p className="font-mono text-[12px] text-ink-800 break-all">{proxy.lastError}</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Panel title={t("pages.codexRuntime.desktopTitle")} icon={<Server size={15} />}>
+        <Panel title={t("codexBoxRuntime.controlPanel")} icon={<Server size={15} />}>
+          <DetailRow label={t("codexBoxRuntime.stateTitle")} value={<StatusPill tone={statusTone} />} />
           <DetailRow
-            label={t("fields.codexHome")}
-            value={<span className="font-mono break-all">{status.codexHome}</span>}
-          />
-          <DetailRow
-            label={t("fields.codexCliPath")}
-            value={<span className="font-mono break-all">{status.codexCliPath || t("common.unknown")}</span>}
-          />
-          <DetailRow
-            label={t("fields.codexDesktopAppPath")}
-            value={<span className="font-mono break-all">{status.codexDesktopAppPath || t("common.unknown")}</span>}
-          />
-          <DetailRow
-            label={t("fields.codexDesktopVersion")}
-            value={status.codexDesktopVersion || t("common.unknown")}
-          />
-          <DetailRow
-            label={t("fields.configReadable")}
-            value={status.configReadable ? t("common.enabled") : t("common.disabled")}
-          />
-        </Panel>
-        <Panel title={t("pages.codexRuntime.opencodexTitle")} icon={<Cpu size={15} />}>
-          <DetailRow
-            label={t("fields.opencodexDir")}
+            label={t("codexBoxRuntime.endpoint")}
             value={
-              <span className="font-mono break-all">
-                {opencodex ? opencodex.providersPath.replace(/\/[^/]+$/, "") : status.opencodexDir}
-              </span>
+              port > 0 ? (
+                <span className="font-mono break-all">{`http://127.0.0.1:${port}/v1`}</span>
+              ) : (
+                <span className="text-ink-500">{t("codexBoxRuntime.notRunning")}</span>
+              )
             }
           />
+          <DetailRow label={t("codexBoxRuntime.startedAt")} value={proxy?.startedAt || "-"} />
           <DetailRow
-            label={t("fields.providersPath")}
-            value={<span className="font-mono break-all">{opencodex?.providersPath || "~/.opencodex/providers.json"}</span>}
+            label={t("codexBoxRuntime.healthz")}
+            value={
+              port > 0 ? (
+                <a
+                  className="font-mono text-[#0A84FF] underline-offset-2 hover:underline"
+                  href={`http://127.0.0.1:${port}/healthz`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {`http://127.0.0.1:${port}/healthz`}
+                </a>
+              ) : (
+                <span className="text-ink-500">-</span>
+              )
+            }
           />
-          <DetailRow
-            label={t("fields.catalogPath")}
-            value={<span className="font-mono break-all">{opencodex?.catalogPath || "~/.opencodex/custom_model_catalog.json"}</span>}
-          />
-          <DetailRow
-            label={t("fields.providersCount")}
-            value={String(opencodex?.providers.length || 0)}
-          />
-          <DetailRow
-            label={t("fields.catalogCount")}
-            value={String(opencodex?.catalog.length || 0)}
-          />
-          <DetailRow
-            label={t("fields.readAt")}
-            value={<span className="font-mono break-all">{opencodex?.readAt || "-"}</span>}
-          />
+          <DetailRow label={t("fields.codexHome")} value={<span className="font-mono break-all">{codexRuntime.codexHome}</span>} />
+        </Panel>
+
+        <Panel
+          title={t("codexBoxRuntime.previewPanel")}
+          icon={<Eye size={15} />}
+          action={
+            <ToolbarButton icon={<Eye size={13} />} onClick={() => void modelsPreview()} disabled={busy || !canStop}>
+              {t("codexBoxRuntime.preview")}
+            </ToolbarButton>
+          }
+        >
+          {preview ? (
+            <div className="space-y-2">
+              <DetailRow label={t("codexBoxRuntime.previewUrl")} value={<span className="font-mono break-all">{preview.baseUrl}</span>} />
+              <div className="rounded-md border border-ink-900/[0.06] bg-ink-900/[0.02] p-3 max-h-72 overflow-y-auto cb-scroll">
+                <pre className="font-mono text-[11px] leading-[1.5] text-ink-800 whitespace-pre-wrap break-all">
+                  {JSON.stringify(preview.rawJson, null, 2)}
+                </pre>
+              </div>
+            </div>
+          ) : (
+            <p className="text-[12px] text-ink-500">{t("codexBoxRuntime.previewHint")}</p>
+          )}
         </Panel>
       </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Panel
+          title={t("codexBoxRuntime.injectPanel")}
+          icon={<Route size={15} />}
+          action={
+            <ToolbarButton icon={<GitCompare size={13} />} onClick={() => void injectPreviewFn()} disabled={busy}>
+              {t("codexBoxRuntime.injectPreview")}
+            </ToolbarButton>
+          }
+        >
+          <p className="text-[12px] leading-[1.6] text-ink-500 mb-3">{t("codexBoxRuntime.injectHint")}</p>
+          {injectPreview && (
+            <div className="space-y-2">
+              <DetailRow label={t("codexBoxRuntime.injectDiffSummary")} value={`+${injectPreview.insertions} / -${injectPreview.deletions}`} />
+              <div className="rounded-md border border-ink-900/[0.06] bg-ink-900/[0.02] p-3 max-h-64 overflow-y-auto cb-scroll">
+                <pre className="font-mono text-[11px] leading-[1.5] text-ink-800 whitespace-pre-wrap break-all">
+                  {injectPreview.diff.map((d, i) => `${d.kind === "insert" ? "+" : d.kind === "delete" ? "-" : " "} ${d.content}`).join("\n")}
+                </pre>
+              </div>
+              <div className="flex justify-end gap-2">
+                <ToolbarButton onClick={() => setInjectPreview(null)} disabled={busy}>
+                  {t("actions.cancel")}
+                </ToolbarButton>
+                <ToolbarButton variant="primary" onClick={() => void injectApply()} disabled={busy}>
+                  {t("codexBoxRuntime.injectConfirm")}
+                </ToolbarButton>
+              </div>
+            </div>
+          )}
+        </Panel>
+
+        <Panel
+          title={t("codexBoxRuntime.restorePanel")}
+          icon={<RotateCcw size={15} />}
+          action={
+            <ToolbarButton icon={<GitCompare size={13} />} onClick={() => void restorePreviewFn()} disabled={busy}>
+              {t("codexBoxRuntime.restorePreview")}
+            </ToolbarButton>
+          }
+        >
+          <p className="text-[12px] leading-[1.6] text-ink-500 mb-3">{t("codexBoxRuntime.restoreHint")}</p>
+          {restorePreview && (
+            <div className="space-y-2">
+              <DetailRow label={t("codexBoxRuntime.injectDiffSummary")} value={`+${restorePreview.insertions} / -${restorePreview.deletions}`} />
+              <div className="rounded-md border border-ink-900/[0.06] bg-ink-900/[0.02] p-3 max-h-64 overflow-y-auto cb-scroll">
+                <pre className="font-mono text-[11px] leading-[1.5] text-ink-800 whitespace-pre-wrap break-all">
+                  {restorePreview.diff.map((d, i) => `${d.kind === "insert" ? "+" : d.kind === "delete" ? "-" : " "} ${d.content}`).join("\n")}
+                </pre>
+              </div>
+              <div className="flex justify-end gap-2">
+                <ToolbarButton onClick={() => setRestorePreview(null)} disabled={busy}>
+                  {t("actions.cancel")}
+                </ToolbarButton>
+                <ToolbarButton variant="primary" onClick={() => void restoreApply()} disabled={busy}>
+                  {t("codexBoxRuntime.restoreConfirm")}
+                </ToolbarButton>
+              </div>
+            </div>
+          )}
+        </Panel>
+      </div>
+
+      <Panel
+        title={t("codexBoxRuntime.routeTable")}
+        icon={<Network size={15} />}
+        action={<span className="text-[11px] text-ink-500">{t("codexBoxRuntime.routeTableCount", { count: proxy?.providers.length ?? 0 })}</span>}
+      >
+        {(proxy?.providers.length ?? 0) === 0 ? (
+          <p className="text-[12px] text-ink-500">{t("codexBoxRuntime.routeTableEmpty")}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12px]">
+              <thead>
+                <tr className="text-left text-ink-500">
+                  <th className="px-2 py-2 font-medium">{t("codexBoxRuntime.col.name")}</th>
+                  <th className="px-2 py-2 font-medium">{t("codexBoxRuntime.col.upstream")}</th>
+                  <th className="px-2 py-2 font-medium">{t("codexBoxRuntime.col.wire")}</th>
+                  <th className="px-2 py-2 font-medium">{t("codexBoxRuntime.col.envKey")}</th>
+                  <th className="px-2 py-2 font-medium">{t("codexBoxRuntime.col.kind")}</th>
+                  <th className="px-2 py-2 font-medium">{t("codexBoxRuntime.col.models")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {proxy!.providers.map((p) => (
+                  <tr key={p.name} className="border-t border-ink-900/[0.06]">
+                    <td className="px-2 py-2 font-mono text-ink-800">{p.name}</td>
+                    <td className="px-2 py-2 font-mono text-[11px] text-ink-700 break-all">{p.originalBaseUrl}</td>
+                    <td className="px-2 py-2 font-mono text-[11px]">{p.wireApi}</td>
+                    <td className="px-2 py-2 font-mono text-[11px]">{p.envKey || "-"}</td>
+                    <td className="px-2 py-2 text-[11px]">{p.kind}</td>
+                    <td className="px-2 py-2 text-[11px]">{p.models.length}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Panel>
+
       <div className="cb-surface p-4">
         <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-ink-700">
-          <ShieldCheck size={14} /> {t("pages.codexRuntime.readonlyHint")}
+          <ShieldCheck size={14} /> {t("codexBoxRuntime.safetyTitle")}
         </div>
         <p className="text-[12px] leading-[1.6] text-ink-500">
-          {t("pages.codexRuntime.readonlyHintBody")}
+          {t("codexBoxRuntime.safetyBody")}
         </p>
       </div>
     </PageShell>
   );
+}
+
+function format_uptime(ms: number): string {
+  if (ms < 1000) return `${ms}ms`;
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m ${s % 60}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
 }
 
 export function DiagnosticsPage() {

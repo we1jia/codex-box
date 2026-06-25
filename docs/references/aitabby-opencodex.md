@@ -54,7 +54,7 @@ Codex Box 读取这份文件时必须：
 
 来源：同上。
 
-记录用户自定义的模型条目：model id / display name / 归属 provider / 可见性（toggle 在 Codex App 里是否展示）/ reasoning 配置等。
+记录用户自定义的模型条目：`slug` / `model` / `display_name` / `provider` / `backend_model` / `backend_provider` / `visibility` 等。
 
 Codex Box 读取这份文件时同上：未知字段保留、不解析 secret、空配置按空处理。
 
@@ -62,21 +62,29 @@ Codex Box 读取这份文件时同上：未知字段保留、不解析 secret、
 
 ## 3. 与 Codex App 的协作方式
 
-Codex App 在启动或"重读配置"时读 `~/.codex/config.toml`，里面的 `[model_providers.*]` 会出现在 picker 里。
+Codex App 在启动或"重读配置"时读 `~/.codex/config.toml`。AITabby/opencodex 的关键不是让 Codex App 自己合并多个 provider，而是把 Codex App 指向一个本地 OpenAI-compatible endpoint：
 
-所以 AITabby/opencodex 与 Codex Box 的"接入点"完全一致：
+- 顶层 `openai_base_url = "http://127.0.0.1:8765/v1"`
+- 顶层 `model_catalog_json = "~/.opencodex/custom_model_catalog.json"`
+- `[model_providers.opencodex]` 的 `base_url = "http://127.0.0.1:8765/v1"`、`wire_api = "responses"`
+
+之后 Codex App 拉 `/v1/models` 时看到的是本地代理合并后的模型列表；发送 `/v1/responses` 或 `/v1/chat/completions` 时，本地代理再按 catalog 的 `slug/backend_model/backend_provider` 和 `providers.json` 路由到真实 upstream。
+
+所以 AITabby/opencodex 与 Codex Box 的接入链路是：
 
 ```
 Codex Box UI
    ↓ 写入
 ~/.opencodex/{providers.json, custom_model_catalog.json}   (Codex Box 内部维护)
-   ↓ 拼装
-~/.codex/config.toml                                       (Codex App 读取)
-   ↓ 重读
-Codex App 模型下拉里出现新模型
+   ↓ 注入
+~/.codex/config.toml                                       (Codex App 读取 127.0.0.1 base_url + catalog path)
+   ↓ /v1/models
+Codex Box 本地代理返回合并模型
+   ↓ /v1/responses or /v1/chat/completions
+Codex Box 本地代理按 model id 路由到真实 provider
 ```
 
-**Codex Box 不需要起任何 gateway 进程、不需要 patch Codex App、不需要拦截 IPC**。这就是 BYOK 的真正含义。
+**Codex Box 不需要 spawn 外部 AITabby/opencodex 进程、不需要 patch Codex App、不需要拦截 IPC**；但要复现这个 BYOK 效果，Codex Box 自身必须有一个仅监听 `127.0.0.1` 的本地代理 runtime。
 
 ---
 

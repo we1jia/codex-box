@@ -8,17 +8,19 @@
 
 ## 1. 产品定位
 
-**Codex Box** 是一个面向 OpenAI Codex 用户的本地桌面控制台,通过安全读写 `~/.codex/config.toml` 实现 **BYOK 模型下拉**。
+**Codex Box** 是一个面向 OpenAI Codex 用户的本地桌面控制台,通过安全读写 `~/.codex/config.toml` 与内置 127.0.0.1 本地代理实现 **BYOK 模型下拉**。
 
 它要做三件事:
 
-1. **BYOK 模型下拉**:让 Codex App 的模型选择里同时出现 — 官方订阅、OpenAI 官方 API、第三方 OpenAI-compatible(含国产模型)、本地/中间层 gateway;切换时整组 `provider + model + reasoning` 一起切。
+1. **BYOK 模型下拉**:让 Codex App 的模型选择里同时出现 — 官方订阅、OpenAI 官方 API、第三方 OpenAI-compatible(含国产模型)、本地/中间层 gateway;切换时整组 `provider + model + reasoning` 一起切。**Codex App 真正能看到的合并 picker 由 Codex Box 内置的 127.0.0.1 代理 runtime 暴露**(`/v1/models`)。
 2. **保留 Codex Box 自有体验**:使用 Tauri + React 做原生桌面控制台,采用 Mac Dashboard + frosted glass 视觉,不复用任何外部项目的 UI 实现。
-3. **安全配置管理**:可视化管理 `~/.codex/config.toml`、profile、provider、备份、diff,写入严格走 backup → diff → confirm → atomic write → rollback。
+3. **安全配置管理**:可视化管理 `~/.codex/config.toml`、`~/.codex/codex-box/inject-map.json`、profile、provider、备份、diff,写入严格走 backup → diff → confirm → atomic write → rollback。
 
 一句话:
 
-> Codex Box = BYOK 模型下拉控制台 + 桌面端 Codex 配置安全管理。
+> Codex Box = BYOK 模型下拉控制台 + 127.0.0.1 本地代理 runtime + 桌面端 Codex 配置安全管理。
+
+详细代理实现见 [`docs/architecture/v0.3.1-BYOK-proxy.md`](./docs/architecture/v0.3.1-BYOK-proxy.md) 与 [ADR-0006](./docs/decisions/0006-本地代理-runtime.md)。
 
 ---
 
@@ -125,6 +127,14 @@ v0.3 的 MVP 跑通四条主路径:
 - ❌ spawn 外部 AITabby/opencodex 进程(走独立 runtime 不走外部 launcher)
 - ❌ 引入无沙箱第三方插件系统
 
+**v0.3.1 起允许**:
+
+- ✅ 内置 127.0.0.1 本地 HTTP 代理(`/v1/models`、`/v1/chat/completions`、`/v1/responses`、`/healthz`)
+- ✅ 代理**仅**监听 127.0.0.1,**不**绑 LAN / IPv6 / Unix socket
+- ✅ 代理**不**读取 `HTTPS_PROXY` / `ALL_PROXY` 等系统代理环境变量
+- ✅ 鉴权走 `${ENV_VAR}` 引用,按需懒读,绝不落盘或上日志
+- ✅ Codex App 端看到的"统一 picker"由代理提供,Codex App 内部 picker 协议不需理解
+
 ---
 
 ## 6. 核心页面
@@ -183,8 +193,9 @@ v0.3 的 MVP 跑通四条主路径:
 |---|---|---|
 | M0 | Tauri 读取/写入 TOML、backup、diff、atomic write | 已完成 |
 | M1 | 只读 Dashboard / Overview | 已完成 |
-| M2 | Provider / Profile MVP,写入闭环,共存迁移 | 部分完成 |
-| M2.5 | **BYOK 模型目录与多 provider 路由底座**(替代旧的"OpenCodex 能力复现底座") | 进行中 |
+| M2 | Provider / Profile MVP,写入闭环,共存迁移 | 已完成 |
+| M2.5 | **BYOK 模型目录与多 provider 路由底座** | 已完成 |
+| M2.6 | **本地代理 runtime 落地**(`src-tauri/src/proxy/*` + Tauri commands + UI 升级) | 已完成 |
 | M3 | Models / Provider Routes / Codex Runtime 页面接真实配置 | 待开始 |
 | M4 | Diagnostics / Settings 接通真实检查与配置 | 待开始 |
 | M5 | 桌面体验打磨:system tray、备份时间线、导入导出 | 待开始 |

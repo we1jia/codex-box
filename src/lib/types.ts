@@ -121,6 +121,8 @@ export interface ModelCatalogEntry {
   modelId: string;
   displayName: string | null;
   provider: string;
+  backendModel?: string | null;
+  backendProvider?: string | null;
   visible: boolean;
   reasoning: ReasoningConfig | null;
   note: string | null;
@@ -225,4 +227,89 @@ export interface SettingsSectionView {
   id: string;
   titleKey: string;
   optionKeys: string[];
+}
+
+// =====================================================================
+// Codex Box 本地代理 runtime (BYOK 真链路)
+// =====================================================================
+
+export type ProxyStatusName = "stopped" | "starting" | "running" | "failed";
+
+export interface ProxyRouteEntry {
+  name: string;
+  originalBaseUrl: string;
+  envKey: string | null;
+  wireApi: string;
+  kind: string;
+  models: string[];
+}
+
+export interface ProxyStatusView {
+  status: ProxyStatusName;
+  port: number;
+  startedAt: string;
+  uptimeMs: number | null;
+  lastError: string | null;
+  providerCount: number;
+  providers: ProxyRouteEntry[];
+}
+
+export interface ProxyModelsPreview {
+  baseUrl: string;
+  rawJson: unknown;
+}
+
+export interface InjectBaseUrlPreview {
+  newConfigText: string;
+  newHash: string;
+  diff: ConfigDiffLineView[];
+  insertions: number;
+  deletions: number;
+  injectMap: {
+    updatedAt: string;
+    port: number;
+    providers: ProxyRouteEntry[];
+  };
+  injectMapHash: string;
+  backupId: string;
+}
+
+export interface ApplyInjectResult {
+  newConfigHash: string;
+  injectMapWrite: OpenCodexWriteResult;
+  backup: {
+    id: string;
+    created_at: string;
+    file_path: string;
+    reason: string;
+    content_hash: string;
+    size_bytes: number;
+  };
+}
+
+export interface RestoreBaseUrlPreview {
+  newConfigText: string;
+  newHash: string;
+  diff: ConfigDiffLineView[];
+  insertions: number;
+  deletions: number;
+  restoredCount: number;
+}
+
+export interface ApplyRestoreResult {
+  newConfigHash: string;
+  backup: {
+    id: string;
+    created_at: string;
+    file_path: string;
+    reason: string;
+    content_hash: string;
+    size_bytes: number;
+  };
+  injectMap: {
+    updatedAt: string;
+    port: number;
+    providers: ProxyRouteEntry[];
+  };
+  clearedInjectMapHash: string;
 }

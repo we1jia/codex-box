@@ -220,12 +220,13 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
 - **M0**：技术验证 — Tauri 读取/写入 TOML、备份、diff、atomic write
 - **M1**：只读 Dashboard
 - **M2**：Provider / Profile MVP，写入闭环，共存迁移
-- **M2.5**：**BYOK 模型目录与多 provider 路由底座**（替代旧定义"OpenCodex 能力复现底座"）— `~/.opencodex/*.json` 读写、provider 路由、Codex Desktop 只读检测
+- **M2.5**：**BYOK 模型目录与多 provider 路由底座** — `~/.opencodex/*.json` 读写、provider 路由、Codex Desktop 只读检测
+- **M2.6**：**BYOK 本地代理 runtime 落地** — `src-tauri/src/proxy/*`(axum + reqwest),`/v1/models` 合并端点,按 model id 路由,127.0.0.1 注入写入闭环。详见 [`docs/architecture/v0.3.1-BYOK-proxy.md`](./docs/architecture/v0.3.1-BYOK-proxy.md) 与 [ADR-0006](./docs/decisions/0006-本地代理-runtime.md)
 - **M3**：Models / Provider Routes / Codex Runtime 页面接真实配置
 - **M4**：Diagnostics / Settings 接通真实检查与配置
 - **M5**：桌面体验打磨 — system tray、备份时间线、导入导出
 
-详见 [PRD.md §9](./PRD.md) 与 [ADR-0005](./docs/decisions/0005-BYOK-模型下拉与多-provider-路由.md)。
+详见 [PRD.md §9](./PRD.md) · [ADR-0005](./docs/decisions/0005-BYOK-模型下拉与多-provider-路由.md) · [ADR-0006](./docs/decisions/0006-本地代理-runtime.md)。
 
 ---
 

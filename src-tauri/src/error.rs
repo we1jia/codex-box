@@ -23,6 +23,14 @@ pub enum AppError {
 
     #[error("Command failed: {0}")]
     Command(String),
+
+    /// 代理 runtime 失败
+    #[error("Proxy runtime: {0}")]
+    Proxy(String),
+
+    /// 端口冲突(应回退到 probe 流程,这里是 probe 用尽后的情况)
+    #[error("Port {0} is in use and no fallback found")]
+    PortInUse(u16),
 }
 
 impl serde::Serialize for AppError {
