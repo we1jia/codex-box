@@ -1,12 +1,11 @@
 {
   "nav": {
-    "dashboard": "仪表盘",
+    "dashboard": "总览",
+    "gateway": "网关服务",
+    "mobile_access": "手机访问",
+    "codex_runtime": "Codex 运行时",
     "profiles": "工作配置",
     "providers": "模型来源",
-    "gateway": "本地网关",
-    "mcp": "MCP 服务",
-    "network": "网络路由",
-    "config_diff": "配置变更",
     "diagnostics": "诊断检查",
     "settings": "设置"
   },
@@ -35,7 +34,18 @@
     "disabled": "已禁用",
     "none": "无",
     "notTested": "未测试",
-    "redacted": "已脱敏"
+    "redacted": "已脱敏",
+    "detected": "已检测到",
+    "notFound": "未找到",
+    "configured": "已配置",
+    "notConfigured": "未配置",
+    "running": "运行中",
+    "stopped": "已停止",
+    "ok": "正常",
+    "notReady": "未就绪",
+    "found": "已找到",
+    "missing": "未找到",
+    "unknown": "未知"
   },
   "actions": {
     "newProfile": "新建工作配置",
@@ -64,7 +74,15 @@
     "rerunAll": "全部重跑",
     "switchLanguage": "切换语言",
     "cancel": "取消",
-    "create": "创建"
+    "create": "创建",
+    "restart": "重启",
+    "refresh": "刷新状态",
+    "openLocalUrl": "打开本机地址",
+    "openMobileUrl": "打开手机地址",
+    "startLocal": "本机启动",
+    "startLan": "局域网启动",
+    "restartLan": "局域网重启",
+    "confirmWrite": "确认写入"
   },
   "summary": {
     "totalProfiles": "工作配置数",
@@ -86,7 +104,27 @@
     "target": "目标",
     "latency": "延迟",
     "name": "名称",
-    "envKey": "环境变量"
+    "envKey": "环境变量",
+    "source": "来源",
+    "sourcePath": "源码路径",
+    "localUrl": "本机地址",
+    "mobileUrl": "手机地址",
+    "lanUrl": "局域网地址",
+    "lanAccess": "局域网访问",
+    "lanPassword": "局域网密码",
+    "sharedCodexHome": "共享配置目录",
+    "password": "访问密码",
+    "lastError": "最近错误",
+    "configPath": "配置文件",
+    "opencodexSource": "OpenCodex 源码",
+    "exists": "是否存在",
+    "configYaml": "config.yaml",
+    "configExists": "config 是否存在",
+    "codexHome": "CODEX_HOME",
+    "runtimeDir": "运行时目录",
+    "healthEndpoint": "健康检查端点",
+    "baseUrl": "base_url",
+    "running": "运行状态"
   },
   "providerKind": {
     "subscription": "官方订阅",
@@ -104,40 +142,47 @@
     "profiles": {
       "title": "工作配置",
       "subtitle": "工作模式入口。用户切换的是一组完整配置：模型、模型来源、网络、MCP 和安全策略一起切换。",
+      "sourceTitle": "配置来源",
       "listTitle": "配置列表",
-      "detailTitle": "配置详情"
+      "detailTitle": "配置详情",
+      "createTitle": "新增工作配置",
+      "createHint": "写入前会先生成 diff；确认后才会备份并写入 config.toml。",
+      "writePreviewTitle": "写入预览",
+      "mcpSubsection": "当前 profile 引用的 MCP 工具"
     },
     "providers": {
       "title": "模型来源",
       "subtitle": "管理模型来源。订阅、官方 API、第三方兼容 API、本地网关分开建模，避免认证混用。",
+      "sourceTitle": "配置来源",
+      "writePreviewTitle": "写入预览",
       "listTitle": "来源列表",
       "detailTitle": "来源详情",
       "createTitle": "新增模型来源",
-      "createHint": "这里只保存到前端状态，不会写入 config.toml。API key 只能填写环境变量名，不能填写明文密钥。"
+      "createHint": "写入前会先生成 diff；确认后才会备份并写入 config.toml。API key 只能填写环境变量名，不能填写明文密钥。",
+      "networkSubsection": "当前 provider 关联的网络路由"
     },
     "gateway": {
-      "title": "本地网关",
-      "subtitle": "管理本地网关预设、运行状态、端口、日志和协议适配。OpenCodex、codex-proxy、CLIProxyAPI 后续在这里接入。",
+      "title": "网关服务",
+      "subtitle": "管理本地网关的运行状态、端口、日志、密码和协议适配。OpenCodex 已作为核心运行底座接入，其他网关后续扩展。",
+      "openCodexTitle": "OpenCodex 运行底座",
+      "lanWarning": "安全提示：Codex Box 默认只用 127.0.0.1 启动 OpenCodex，不会自动暴露到局域网。手机访问地址只是候选地址；只有先配置访问密码，再使用局域网启动后才会启用。",
       "presetsTitle": "网关预设",
-      "runtimeTitle": "运行状态"
+      "runtimeTitle": "运行状态",
+      "diffSubsection": "Gateway 启动可能改动的范围"
     },
-    "mcp": {
-      "title": "MCP 服务",
-      "subtitle": "管理 Codex 可用工具。重点检查 command/url、启用状态和 env 引用，secret 不明文展示。",
-      "listTitle": "服务列表",
-      "detailTitle": "服务详情"
+    "mobileAccess": {
+      "title": "手机访问",
+      "subtitle": "通过局域网或本机 URL 在手机/浏览器访问 Codex Box 的中间件。先确认安全提示，再启用 LAN。",
+      "qrTitle": "访问二维码",
+      "qrPlaceholder": "二维码占位 (M3 接入 qrcode.react)",
+      "infoTitle": "访问信息",
+      "lanOffHint": "手机访问未启用。请先在 Gateway 页配置访问密码并以局域网模式启动。"
     },
-    "network": {
-      "title": "网络路由",
-      "subtitle": "管理 Codex Box 的网络路由，只作用于配置和诊断，不接管系统全局代理。",
-      "routesTitle": "路由列表",
-      "testTitle": "连通性测试"
-    },
-    "configDiff": {
-      "title": "配置变更",
-      "subtitle": "所有写入都必须先备份、再展示变更、最后原子写入。当前页面只演示安全流程，不直接写配置。",
-      "flowTitle": "写入流程",
-      "diffTitle": "变更预览"
+    "codexRuntime": {
+      "title": "Codex 运行时",
+      "subtitle": "展示 Codex Desktop / OpenCodex 的运行路径、配置入口和共享状态。Codex Box 不修改 Codex Desktop 内部文件。",
+      "checkoutTitle": "OpenCodex 检出",
+      "sharedTitle": "共享与运行时"
     },
     "diagnostics": {
       "title": "诊断检查",
@@ -166,6 +211,10 @@
       "title": "原子写入",
       "desc": "tmp 写入成功后 rename"
     }
+  },
+  "diff": {
+    "insertions": "新增行",
+    "deletions": "删除行"
   },
   "diagnostics": {
     "groups": {
@@ -223,20 +272,30 @@
   },
   "feedback": {
     "profileCreate": "已打开工作配置创建流程草稿。",
-    "profileActivated": "{{name}} 已标记为当前配置（演示状态，尚未写入）。",
+    "profileActivated": "{{name}} 已设为当前 Profile。",
+    "profileCreated": "Profile {{name}} 已写入配置。",
+    "profileFormInvalid": "Profile 名称、模型和 provider 都不能为空。",
+    "profileExists": "同名 Profile 已存在。",
     "profileCopied": "已复制 {{name}} 的配置结构。",
     "dangerBlocked": "危险操作已拦截。真实删除必须先进入变更确认和备份流程。",
     "providerCreate": "已打开模型来源创建流程草稿。",
-    "providerCreated": "{{name}} 已添加到本地列表（尚未写入配置文件）。",
+    "providerCreated": "{{name}} 已写入配置。",
     "providerFormInvalid": "请填写名称、base_url、环境变量和至少一个模型。",
     "providerSecretRejected": "这里不能填写明文密钥，请只填写环境变量名，例如 OPENROUTER_API_KEY。",
     "connectionTested": "{{name}} 连接测试已完成（模拟）。",
     "providerCopied": "已复制 {{name}} 的模型来源配置。",
-    "previewDiff": "已准备跳转到配置变更预览。",
+    "previewDiff": "已生成配置变更预览。",
     "gatewayPreset": "已打开网关预设导入流程。",
     "gatewayStarted": "{{name}} 已进入运行中状态（前端模拟）。",
     "gatewayStopped": "{{name}} 已停止（前端模拟）。",
     "openLogs": "日志入口已就绪，后续会接入真实日志读取。",
+    "openCodexStarted": "OpenCodex gateway 已启动。",
+    "gatewayStarted": "OpenCodex gateway 已启动（本机模式）。",
+    "gatewayStartedLan": "OpenCodex gateway 已启动（局域网模式）。",
+    "openCodexLanStarted": "OpenCodex gateway 已按局域网模式启动。",
+    "openCodexStopped": "OpenCodex gateway 已停止。",
+    "openCodexRestarted": "OpenCodex gateway 已重启。",
+    "openCodexUrlOpened": "已打开 OpenCodex 访问地址。",
     "mcpCreate": "已打开 MCP 创建流程草稿。",
     "mcpToggled": "{{name}} 的启用状态已更新（前端模拟）。",
     "mcpTested": "{{name}} 测试完成（模拟）。",

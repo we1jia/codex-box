@@ -26,6 +26,7 @@ pub struct ProfileEntry {
     pub approval_policy: Option<String>,
     pub sandbox_mode: Option<String>,
     pub network: Option<String>,
+    pub mcp_refs: Vec<String>,
     pub is_active: bool,
 }
 
@@ -37,6 +38,7 @@ pub struct ModelProviderEntry {
     pub base_url: Option<String>,
     pub wire_api: WireApi,
     pub api_key_env: Option<String>,
+    pub models: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

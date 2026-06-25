@@ -10,23 +10,37 @@ export default {
     extend: {
       fontFamily: {
         serif: [
-          // 中文衬线优先(思源宋体),英文衬线次之,系统衬线兜底
-          "Noto Serif SC",
-          "Source Han Serif SC",
-          "STSong",
+          // 中文衬线走系统字体(v0.6 修订,见 ADR-0003):
+          // - macOS  :Songti SC / STSong(注意:macOS 系统宋体无 500/600 字重,
+          //          font-semibold 在大标题上仍渲染为 Regular,权衡后接受)
+          // - Windows:SimSun / FangSong
+          // - Linux  :Noto Serif CJK SC / AR PL UMing CN
+          // 英文回退到系统衬线栈。bundle 内不放 Noto Serif SC webfont。
           "Songti SC",
+          "STSong",
+          "STSongti-SC-Regular",
+          "Source Han Serif SC",
+          "SimSun",
+          "FangSong",
+          "Noto Serif CJK SC",
+          "AR PL UMing CN",
+          "Times New Roman",
           "serif",
         ],
         sans: [
-          // 英文优先 Inter Variable(可变字体,100-900 全字重),
-          // 中文走思源黑体 SC,最后系统字体兜底。
-          // 浏览器会按字符 unicode-range 自动选择字体,无需手动切换。
+          // 英文优先 Inter Variable(本地 webfont,100-900 全字重),
+          // 中文走系统无衬线(覆盖三大平台):
+          // - macOS  :PingFang SC / Hiragino Sans GB
+          // - Windows:Microsoft YaHei
+          // - Linux  :Noto Sans CJK SC / WenQuanYi Micro Hei
+          // 浏览器按字符 unicode-range 自动选择字体,无需手动切换。
           "Inter Variable",
           "Inter",
-          "Noto Sans SC",
           "PingFang SC",
           "Hiragino Sans GB",
           "Microsoft YaHei",
+          "Noto Sans CJK SC",
+          "WenQuanYi Micro Hei",
           "system-ui",
           "sans-serif",
         ],

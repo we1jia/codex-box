@@ -47,8 +47,8 @@ pub fn parse(raw: &str) -> AppResult<CodexConfig> {
     }
 
     let active_profile = top_level
-        .get("profile")
-        .or_else(|| top_level.get("active_profile"))
+        .get("active_profile")
+        .or_else(|| top_level.get("profile"))
         .and_then(|v| v.as_str())
         .map(String::from);
 
@@ -92,6 +92,7 @@ fn parse_profile_entry(name: &str, val: &toml::Value) -> ProfileEntry {
         approval_policy: get_string(table, "approval_policy"),
         sandbox_mode: get_string(table, "sandbox_mode"),
         network: get_string(table, "network"),
+        mcp_refs: get_string_array(table, "mcp_refs"),
         is_active: false,
     }
 }
@@ -128,6 +129,12 @@ fn parse_model_provider(name: &str, val: &toml::Value) -> ModelProviderEntry {
         .or_else(|| get_string(table, "api_key_env_var"))
         .or_else(|| get_string(table, "env_key"))
         .or_else(|| get_string(table, "env_key_name"));
+    let mut models = get_string_array(table, "models");
+    if models.is_empty() {
+        if let Some(model) = get_string(table, "model") {
+            models.push(model);
+        }
+    }
 
     ModelProviderEntry {
         name: name.to_string(),
@@ -136,6 +143,7 @@ fn parse_model_provider(name: &str, val: &toml::Value) -> ModelProviderEntry {
         base_url,
         wire_api,
         api_key_env,
+        models,
     }
 }
 
@@ -202,6 +210,18 @@ fn get_string(table: Option<&toml::map::Map<String, toml::Value>>, key: &str) ->
         .and_then(|t| t.get(key))
         .and_then(|v| v.as_str())
         .map(String::from)
+}
+
+fn get_string_array(table: Option<&toml::map::Map<String, toml::Value>>, key: &str) -> Vec<String> {
+    table
+        .and_then(|t| t.get(key))
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|value| value.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn infer_provider_kind(
@@ -290,8 +310,8 @@ fn is_local_gateway(base_url: Option<&str>) -> bool {
 pub fn to_dashboard_summary(config: &CodexConfig) -> DashboardSummary {
     let active_profile = config
         .top_level
-        .get("profile")
-        .or_else(|| config.top_level.get("active_profile"))
+        .get("active_profile")
+        .or_else(|| config.top_level.get("profile"))
         .or_else(|| config.top_level.get("model"))
         .and_then(|v| v.as_str())
         .map(String::from);
@@ -421,6 +441,7 @@ wire_api = "chat"
 kind = "openai_compatible"
 base_url = "https://openrouter.ai/api/v1"
 env_key = "OPENROUTER_API_KEY"
+models = ["openai/gpt-5-mini", "anthropic/claude-sonnet"]
 "#;
         let cfg = parse(raw).expect("parse ok");
         assert_eq!(cfg.model_providers.len(), 3);
@@ -453,6 +474,13 @@ env_key = "OPENROUTER_API_KEY"
             openrouter.api_key_env.as_deref(),
             Some("OPENROUTER_API_KEY")
         );
+        assert_eq!(
+            openrouter.models,
+            vec![
+                "openai/gpt-5-mini".to_string(),
+                "anthropic/claude-sonnet".to_string()
+            ]
+        );
     }
 
     #[test]
@@ -466,6 +494,7 @@ model_provider = "openai"
 sandbox_mode = "workspace-write"
 approval_policy = "on-request"
 network = "direct"
+mcp_refs = ["filesystem", "git"]
 
 [profile.gateway]
 model = "claude-sonnet"
@@ -479,6 +508,10 @@ model_provider = "local_gateway"
         assert_eq!(dev.model.as_deref(), Some("gpt-5.5"));
         assert_eq!(dev.model_provider.as_deref(), Some("openai"));
         assert_eq!(dev.sandbox_mode.as_deref(), Some("workspace-write"));
+        assert_eq!(
+            dev.mcp_refs,
+            vec!["filesystem".to_string(), "git".to_string()]
+        );
 
         let gateway = cfg.profiles.iter().find(|p| p.name == "gateway").unwrap();
         assert!(!gateway.is_active);

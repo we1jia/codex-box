@@ -1,15 +1,17 @@
 /**
  * Codex Box 全局字体加载入口
  *
- * 策略:
- * - 英文 / 等宽走 Inter Variable + JetBrains Mono Variable,按 unicode-range 切片加载。
- * - 中文走思源黑体 SC (Noto Sans SC) 400 + 500 + 思源宋体 SC (Noto Serif SC) 600,
- *   同样按 unicode-range 切片,浏览器按字符自动 fallback。
- * - 所有字体都来自本地 node_modules (fontsource),不走 CDN,离线可用。
+ * 策略(v0.6 修订,见 ADR-0003):
+ * - 英文 / 等宽走 Inter Variable + JetBrains Mono Variable,
+ *   按 unicode-range 切片加载,完全本地打包(不依赖 CDN)。
+ * - 中文回退到系统字体:
+ *     无衬线:PingFang SC(macOS)/ Microsoft YaHei(Win)/ Noto Sans CJK SC(Linux)
+ *     衬线  :Songti SC / STSong(macOS)/ SimSun(Win)/ Noto Serif CJK SC(Linux)
+ *   浏览器按字符自动 fallback。
+ *
+ * 修订前:中文走思源黑体 / 思源宋体 SC(fontsource),bundle 约 +3.7MB。
+ * 修订后:去掉 Noto SC,仅保留英文 webfont(~0.5MB),首屏不再等中文 webfont。
  */
 
 @import "@fontsource-variable/inter/wght.css";
 @import "@fontsource-variable/jetbrains-mono/wght.css";
-@import "@fontsource/noto-sans-sc/400.css";
-@import "@fontsource/noto-sans-sc/500.css";
-@import "@fontsource/noto-serif-sc/600.css";

@@ -47,10 +47,7 @@ mod tests {
     fn read_raw_missing_file_errors() {
         let path = Path::new("/tmp/codex-box-nonexistent-zzzz.toml");
         let _ = std::fs::remove_file(path);
-        assert!(matches!(
-            read_raw(path),
-            Err(AppError::ConfigNotFound(_))
-        ));
+        assert!(matches!(read_raw(path), Err(AppError::ConfigNotFound(_))));
     }
 
     #[test]

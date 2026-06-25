@@ -3,14 +3,13 @@ import { useTranslation } from "react-i18next";
 import {
   Plus,
   LayoutDashboard,
-  Users,
   Server,
-  Globe,
-  Puzzle,
-  GitCompare,
+  Cable,
+  Smartphone,
+  Cpu,
+  Users,
   Activity,
   Settings,
-  Cable,
   PanelLeftClose,
   PanelLeftOpen,
 } from "lucide-react";
@@ -24,17 +23,19 @@ import { startWindowDragFromMouseEvent } from "@/lib/window-drag";
 
 const NAV_ITEMS = [
   { id: "dashboard", Icon: LayoutDashboard, key: "1" },
-  { id: "profiles", Icon: Users, key: "2" },
-  { id: "providers", Icon: Server, key: "3" },
-  { id: "gateway", Icon: Cable, key: "4" },
-  { id: "mcp", Icon: Puzzle, key: "5" },
-  { id: "network", Icon: Globe, key: "6" },
-  { id: "config_diff", Icon: GitCompare, key: "7" },
-  { id: "diagnostics", Icon: Activity, key: "8" },
+  { id: "gateway", Icon: Cable, key: "2" },
+  { id: "mobile_access", Icon: Smartphone, key: "3" },
+  { id: "codex_runtime", Icon: Cpu, key: "4" },
+  { id: "profiles", Icon: Users, key: "5" },
+  { id: "providers", Icon: Server, key: "6" },
+  { id: "diagnostics", Icon: Activity, key: "7" },
   { id: "settings", Icon: Settings, key: "," },
 ] as const;
 
-const SIDEBAR_TOGGLE_TOP = "16px";
+const SIDEBAR_TOGGLE_VIEWPORT_TOP = "16px";
+const SIDEBAR_TOGGLE_EMBEDDED_TOP =
+  "calc(16px - var(--window-pad) - 1px)";
+const SIDEBAR_TOGGLE_EXPANDED_RIGHT = "20px";
 const SIDEBAR_TOGGLE_COLLAPSED_LEFT = "98px";
 
 interface SidebarProps {
@@ -44,7 +45,7 @@ interface SidebarProps {
 /**
  * 展开/收起按钮的共享逻辑 + 视觉。
  * 通过 variant 控制渲染位置:
- * - "inline": 作为 sidebar 顶部菜单区的 flex 项(展开态)
+ * - "embedded": 嵌在 sidebar 卡片右上角(展开态)
  * - "floating": fixed 浮窗态(收起态)
  */
 function KButton({
@@ -55,7 +56,7 @@ function KButton({
   onHoverEnd,
 }: {
   collapsed: boolean;
-  variant: "inline" | "floating";
+  variant: "embedded" | "floating";
   onClick: () => void;
   onHoverStart?: () => void;
   onHoverEnd?: () => void;
@@ -84,7 +85,7 @@ function KButton({
         {...sharedProps}
         style={{
           left: SIDEBAR_TOGGLE_COLLAPSED_LEFT,
-          top: SIDEBAR_TOGGLE_TOP,
+          top: SIDEBAR_TOGGLE_VIEWPORT_TOP,
         }}
         className={`fixed z-30 ${baseClass}`}
       >
@@ -93,18 +94,15 @@ function KButton({
     );
   }
 
-  if (variant === "inline") {
-    // 展开态:用 fixed 与收起态同一坐标系(top=16 已与红绿灯水平对齐),
-    // left 计算为 sidebar 右边缘外 12px,跟随宽度自动跟随。
-    const w = useUIStore.getState().sidebarWidth;
+  if (variant === "embedded") {
     return (
       <button
         {...sharedProps}
         style={{
-          top: SIDEBAR_TOGGLE_TOP,
-          left: `calc(var(--window-pad) + ${w}px + 12px)`,
+          top: SIDEBAR_TOGGLE_EMBEDDED_TOP,
+          right: SIDEBAR_TOGGLE_EXPANDED_RIGHT,
         }}
-        className={`fixed z-30 ${baseClass}`}
+        className={`absolute z-30 ${baseClass}`}
       >
         <PanelLeftClose size={14} />
       </button>
@@ -258,6 +256,13 @@ export function Sidebar({ preview = false }: SidebarProps) {
             "flex flex-col",
           ].join(" ")}
         >
+          {/* 展开态按钮固定在 sidebar 卡片右上角,与 macOS traffic lights 对齐。 */}
+          <KButton
+            collapsed={false}
+            variant="embedded"
+            onClick={() => setSidebar(true)}
+          />
+
           {/* 顶部菜单区,留出 traffic lights 安全区。 */}
           <div className="px-5 pt-[76px] pb-4 flex items-center gap-2.5">
             <button
@@ -299,15 +304,6 @@ export function Sidebar({ preview = false }: SidebarProps) {
           {/* 右侧拖拽热区 */}
           <ResizeHandle width={sidebarWidth} onResize={handleResize} />
         </aside>
-      )}
-
-      {/* K 按钮:展开态放在 sidebar 外层,避免 backdrop-filter 改变 fixed 定位基准。 */}
-      {!collapsed && (
-        <KButton
-          collapsed={false}
-          variant="inline"
-          onClick={() => setSidebar(true)}
-        />
       )}
 
       {/* 收起态下的 hover 浮窗:从 K 按钮位置向左滑出 */}

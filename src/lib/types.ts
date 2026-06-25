@@ -18,6 +18,67 @@ export interface DashboardSummary {
   health_summary: HealthSummary;
 }
 
+export interface ConfigSnapshotView {
+  configPath: string;
+  activeProfile: string | null;
+  profiles: ProfileView[];
+  providers: ProviderView[];
+}
+
+export type ConfigChangeRequest =
+  | {
+      type: "add_provider";
+      id: string;
+      kind: ProviderView["kind"];
+      baseUrl: string;
+      wireApi: ProviderView["wireApi"];
+      envKey: string;
+      models: string[];
+    }
+  | {
+      type: "add_profile";
+      name: string;
+      model: string;
+      providerId: string;
+      sandbox: string;
+      approval: string;
+      network: string;
+      mcpRefs: string[];
+    }
+  | {
+      type: "set_active_profile";
+      profileName: string;
+    };
+
+export interface ConfigDiffLineView {
+  kind: "context" | "insert" | "delete";
+  content: string;
+  oldLine: number | null;
+  newLine: number | null;
+}
+
+export interface ConfigChangePreviewView {
+  configPath: string;
+  expectedHash: string;
+  diff: ConfigDiffLineView[];
+  insertions: number;
+  deletions: number;
+  requiresConfirmation: boolean;
+}
+
+export interface ApplyConfigChangeResultView {
+  configPath: string;
+  backup: {
+    id: string;
+    created_at: string;
+    file_path: string;
+    reason: string;
+    content_hash: string;
+    size_bytes: number;
+  };
+  newHash: string;
+}
+
 export type StatusTone = "ok" | "warn" | "fail" | "idle" | "running";
 
 export interface ProfileView {
@@ -54,6 +115,34 @@ export interface GatewayPresetView {
   logPath: string;
   healthPath: string;
   adapter: string;
+}
+
+export interface OpenCodexStatus {
+  sourcePath: string;
+  exists: boolean;
+  packageJsonPath: string;
+  configYamlPath: string;
+  configExists: boolean;
+  authPasswordConfigured: boolean;
+  running: boolean;
+  managed: boolean;
+  pid: number | null;
+  host: string;
+  port: number;
+  localUrl: string;
+  lanUrls: string[];
+  mobileUrl: string | null;
+  lanAccessEnabled: boolean;
+  mobileUrlReachable: boolean;
+  codexHome: string;
+  sharedCodexHome: string;
+  runtimeDir: string;
+  logPath: string;
+  healthEndpoint: string;
+  healthOk: boolean;
+  healthStatus: number | null;
+  lastError: string | null;
+  lanRequiresPassword: boolean;
 }
 
 export interface McpServerView {

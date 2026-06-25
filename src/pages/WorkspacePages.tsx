@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Activity,
@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   ChevronRight,
   Copy,
+  Cpu,
   GitCompare,
   Globe,
   KeyRound,
@@ -21,24 +22,34 @@ import {
   Server,
   Settings,
   ShieldCheck,
+  Smartphone,
   Square,
   TestTube2,
   Trash2,
   Users,
 } from "lucide-react";
+import { invokeCmd } from "@/lib/api";
 import { setLanguage } from "@/lib/i18n";
 import {
   mockDiagnostics,
   mockDiffLines,
   mockGateways,
-  mockMcpServers,
-  mockNetworkRoutes,
   mockProfiles,
   mockProviders,
   mockSettingsSections,
 } from "@/lib/mock-data";
-import type { DiagnosticGroupView, DiffLineView, StatusTone } from "@/lib/types";
-import type { ProviderView } from "@/lib/types";
+import type {
+  ApplyConfigChangeResultView,
+  ConfigChangePreviewView,
+  ConfigChangeRequest,
+  ConfigSnapshotView,
+  DiagnosticGroupView,
+  DiffLineView,
+  OpenCodexStatus,
+  ProfileView,
+  ProviderView,
+  StatusTone,
+} from "@/lib/types";
 
 type NoticeTone = "info" | "success" | "warning";
 
@@ -265,7 +276,7 @@ function SummaryStrip({
 }
 
 function SecretText({ value }: { value: string }) {
-  const masked = value.includes("KEY") ? value : "env ref";
+  const masked = looksLikeSecret(value) ? "redacted" : value || "not configured";
   return (
     <span className="inline-flex items-center gap-1.5 rounded bg-ink-900/[0.04] px-2 py-1 font-mono text-[12px] text-ink-700">
       <KeyRound size={12} />
@@ -287,6 +298,39 @@ type ProviderDraft = {
   wireApi: ProviderView["wireApi"];
   envKey: string;
   models: string;
+};
+
+type PendingProviderChange = {
+  change: ConfigChangeRequest;
+  preview: ConfigChangePreviewView;
+  providerName: string;
+};
+
+type ProfileDraft = {
+  name: string;
+  model: string;
+  providerId: string;
+  sandbox: string;
+  approval: string;
+  network: string;
+  mcpRefs: string;
+};
+
+const EMPTY_PROFILE_DRAFT: ProfileDraft = {
+  name: "",
+  model: "",
+  providerId: "codex-subscription",
+  sandbox: "workspace-write",
+  approval: "on-request",
+  network: "direct",
+  mcpRefs: "",
+};
+
+type PendingProfileChange = {
+  change: ConfigChangeRequest;
+  preview: ConfigChangePreviewView;
+  successMessage: string;
+  selectId?: string;
 };
 
 const EMPTY_PROVIDER_DRAFT: ProviderDraft = {
@@ -427,30 +471,334 @@ function ProviderCreatePanel({
   );
 }
 
+function ProfileCreatePanel({
+  draft,
+  providers,
+  setDraft,
+  onCancel,
+  onCreate,
+}: {
+  draft: ProfileDraft;
+  providers: ProviderView[];
+  setDraft: (draft: ProfileDraft) => void;
+  onCancel: () => void;
+  onCreate: () => void;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <Panel title={t("pages.profiles.createTitle")} icon={<Plus size={15} />}>
+      <form
+        className="grid grid-cols-2 gap-3"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onCreate();
+        }}
+      >
+        <FormField label={t("fields.name")}>
+          <input
+            className={inputClass}
+            value={draft.name}
+            placeholder="openrouter-dev"
+            onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+          />
+        </FormField>
+        <FormField label="model">
+          <input
+            className={inputClass}
+            value={draft.model}
+            placeholder="openai/gpt-5-mini"
+            onChange={(event) => setDraft({ ...draft, model: event.target.value })}
+          />
+        </FormField>
+        <FormField label="model_provider">
+          <select
+            className={inputClass}
+            value={draft.providerId}
+            onChange={(event) => setDraft({ ...draft, providerId: event.target.value })}
+          >
+            {providers.map((provider) => (
+              <option key={provider.id} value={provider.id}>
+                {provider.name}
+              </option>
+            ))}
+          </select>
+        </FormField>
+        <FormField label="sandbox_mode">
+          <select
+            className={inputClass}
+            value={draft.sandbox}
+            onChange={(event) => setDraft({ ...draft, sandbox: event.target.value })}
+          >
+            {["read-only", "workspace-write", "danger-full-access"].map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </FormField>
+        <FormField label="approval_policy">
+          <select
+            className={inputClass}
+            value={draft.approval}
+            onChange={(event) => setDraft({ ...draft, approval: event.target.value })}
+          >
+            {["on-request", "on-failure", "never"].map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </FormField>
+        <FormField label="network">
+          <input
+            className={inputClass}
+            value={draft.network}
+            placeholder="direct"
+            onChange={(event) => setDraft({ ...draft, network: event.target.value })}
+          />
+        </FormField>
+        <FormField label="mcp_refs">
+          <input
+            className={inputClass}
+            value={draft.mcpRefs}
+            placeholder="filesystem, git"
+            onChange={(event) => setDraft({ ...draft, mcpRefs: event.target.value })}
+          />
+        </FormField>
+        <div className="col-span-2 flex items-center justify-between gap-3 border-t border-ink-900/[0.06] pt-3">
+          <p className="cb-muted">{t("pages.profiles.createHint")}</p>
+          <div className="flex shrink-0 gap-2">
+            <ToolbarButton onClick={onCancel}>{t("actions.cancel")}</ToolbarButton>
+            <ToolbarButton icon={<Plus size={13} />} variant="primary" type="submit">
+              {t("actions.create")}
+            </ToolbarButton>
+          </div>
+        </div>
+      </form>
+    </Panel>
+  );
+}
+
 export function ProfilesPage() {
   const { t } = useTranslation();
   const { notice, show } = useNotice();
+  const [profiles, setProfiles] = useState<ProfileView[]>(mockProfiles);
+  const [providers, setProviders] = useState<ProviderView[]>(mockProviders);
+  const [configPath, setConfigPath] = useState("~/.codex/config.toml");
+  const [creating, setCreating] = useState(false);
+  const [draft, setDraft] = useState<ProfileDraft>(EMPTY_PROFILE_DRAFT);
+  const [pendingChange, setPendingChange] = useState<PendingProfileChange | null>(null);
+  const [writeBusy, setWriteBusy] = useState(false);
   const [selectedId, setSelectedId] = useState(mockProfiles[0].id);
-  const selected = mockProfiles.find((item) => item.id === selectedId) || mockProfiles[0];
+  const selected = profiles.find((item) => item.id === selectedId) || profiles[0];
+
+  const refreshConfigSnapshot = async (nextSelectedId?: string) => {
+    const result = await invokeCmd<ConfigSnapshotView>("config_snapshot");
+    if (result.ok) {
+      const nextProfiles = result.data.profiles.length > 0 ? result.data.profiles : mockProfiles;
+      const nextProviders = result.data.providers.length > 0 ? result.data.providers : mockProviders;
+      setProfiles(nextProfiles);
+      setProviders(nextProviders);
+      setConfigPath(result.data.configPath);
+      setSelectedId(
+        nextSelectedId ||
+          nextProfiles.find((profile) => profile.isActive)?.id ||
+          nextProfiles[0]?.id ||
+          ""
+      );
+      setDraft((current) => ({
+        ...current,
+        providerId: nextProviders[0]?.id || "codex-subscription",
+      }));
+    } else {
+      show("warning", result.error);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    void invokeCmd<ConfigSnapshotView>("config_snapshot").then((result) => {
+      if (cancelled) return;
+      if (result.ok) {
+        const nextProfiles = result.data.profiles.length > 0 ? result.data.profiles : mockProfiles;
+        const nextProviders = result.data.providers.length > 0 ? result.data.providers : mockProviders;
+        setProfiles(nextProfiles);
+        setProviders(nextProviders);
+        setConfigPath(result.data.configPath);
+        setSelectedId(
+          nextProfiles.find((profile) => profile.isActive)?.id || nextProfiles[0]?.id || ""
+        );
+        setDraft((current) => ({
+          ...current,
+          providerId: nextProviders[0]?.id || "codex-subscription",
+        }));
+      } else {
+        show("warning", result.error);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const createProfile = async () => {
+    const trimmedName = draft.name.trim();
+    const trimmedModel = draft.model.trim();
+    const mcpRefs = draft.mcpRefs
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean);
+
+    if (!trimmedName || !trimmedModel || !draft.providerId) {
+      show("warning", t("feedback.profileFormInvalid"));
+      return;
+    }
+    if (profiles.some((profile) => profile.id === trimmedName)) {
+      show("warning", t("feedback.profileExists"));
+      return;
+    }
+
+    const change: ConfigChangeRequest = {
+      type: "add_profile",
+      name: trimmedName,
+      model: trimmedModel,
+      providerId: draft.providerId,
+      sandbox: draft.sandbox,
+      approval: draft.approval,
+      network: draft.network,
+      mcpRefs,
+    };
+    const result = await invokeCmd<ConfigChangePreviewView>("config_change_preview", { change });
+    if (result.ok) {
+      setPendingChange({
+        change,
+        preview: result.data,
+        successMessage: t("feedback.profileCreated", { name: trimmedName }),
+        selectId: trimmedName,
+      });
+      setCreating(false);
+      show("info", t("feedback.previewDiff"));
+    } else {
+      show("warning", result.error);
+    }
+  };
+
+  const previewSetActive = async () => {
+    if (!selected || selected.isActive) return;
+    const change: ConfigChangeRequest = {
+      type: "set_active_profile",
+      profileName: selected.name,
+    };
+    const result = await invokeCmd<ConfigChangePreviewView>("config_change_preview", { change });
+    if (result.ok) {
+      setPendingChange({
+        change,
+        preview: result.data,
+        successMessage: t("feedback.profileActivated", { name: selected.name }),
+        selectId: selected.id,
+      });
+      show("info", t("feedback.previewDiff"));
+    } else {
+      show("warning", result.error);
+    }
+  };
+
+  const applyPendingProfile = async () => {
+    if (!pendingChange) return;
+    setWriteBusy(true);
+    const result = await invokeCmd<ApplyConfigChangeResultView>("config_change_apply", {
+      request: {
+        change: pendingChange.change,
+        expectedHash: pendingChange.preview.expectedHash,
+      },
+    });
+    setWriteBusy(false);
+    if (result.ok) {
+      const selectId = pendingChange.selectId;
+      const successMessage = pendingChange.successMessage;
+      setDraft(EMPTY_PROFILE_DRAFT);
+      setPendingChange(null);
+      show("success", successMessage);
+      await refreshConfigSnapshot(selectId);
+    } else {
+      show("warning", result.error);
+    }
+  };
 
   return (
     <PageShell
       title={t("pages.profiles.title")}
       subtitle={t("pages.profiles.subtitle")}
       notice={notice}
-      action={<ToolbarButton icon={<Plus size={13} />} variant="primary" onClick={() => show("info", t("feedback.profileCreate"))}>{t("actions.newProfile")}</ToolbarButton>}
+      action={<ToolbarButton icon={<Plus size={13} />} variant="primary" onClick={() => { setCreating(true); show("info", t("feedback.profileCreate")); }}>{t("actions.newProfile")}</ToolbarButton>}
     >
+      {creating && (
+        <ProfileCreatePanel
+          draft={draft}
+          providers={providers}
+          setDraft={setDraft}
+          onCancel={() => {
+            setCreating(false);
+            setDraft(EMPTY_PROFILE_DRAFT);
+          }}
+          onCreate={createProfile}
+        />
+      )}
+      {pendingChange && (
+        <Panel title={t("pages.profiles.writePreviewTitle")} icon={<GitCompare size={15} />}>
+          <SummaryStrip
+            items={[
+              { label: t("fields.configPath"), value: pendingChange.preview.configPath },
+              { label: t("diff.insertions"), value: String(pendingChange.preview.insertions), tone: "ok" },
+              { label: t("diff.deletions"), value: String(pendingChange.preview.deletions), tone: pendingChange.preview.deletions > 0 ? "warn" : "idle" },
+            ]}
+          />
+          <div className="mt-4 max-h-[320px] overflow-auto rounded-md bg-[#14171A] p-4 font-mono text-[12px] leading-[1.7] text-white/88 shadow-inner">
+            {pendingChange.preview.diff.map((line, index) => (
+              <DiffLine
+                key={`${index}-${line.kind}`}
+                line={{
+                  id: String(index),
+                  kind: line.kind,
+                  content: line.content,
+                }}
+              />
+            ))}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <ToolbarButton
+              icon={<Save size={13} />}
+              variant="primary"
+              disabled={writeBusy}
+              onClick={() => void applyPendingProfile()}
+            >
+              {t("actions.confirmWrite")}
+            </ToolbarButton>
+            <ToolbarButton
+              icon={<RotateCcw size={13} />}
+              disabled={writeBusy}
+              onClick={() => setPendingChange(null)}
+            >
+              {t("actions.cancel")}
+            </ToolbarButton>
+          </div>
+        </Panel>
+      )}
       <SummaryStrip
         items={[
-          { label: t("summary.totalProfiles"), value: String(mockProfiles.length) },
-          { label: t("summary.activeProfile"), value: mockProfiles.find((item) => item.isActive)?.name || "-" },
+          { label: t("summary.totalProfiles"), value: String(profiles.length) },
+          { label: t("summary.activeProfile"), value: profiles.find((item) => item.isActive)?.name || "-" },
           { label: t("summary.safeWrites"), value: t("common.enabled"), tone: "ok" },
         ]}
       />
+      <Panel title={t("pages.profiles.sourceTitle")} icon={<GitCompare size={15} />}>
+        <DetailRow label={t("fields.configPath")} value={<span className="font-mono break-all">{configPath}</span>} />
+      </Panel>
       <div className="grid grid-cols-[minmax(240px,0.82fr)_minmax(0,1.35fr)] gap-4">
         <Panel title={t("pages.profiles.listTitle")} icon={<Users size={15} />}>
           <div className="flex flex-col gap-2">
-            {mockProfiles.map((profile) => (
+            {profiles.map((profile) => (
               <ListButton
                 key={profile.id}
                 active={profile.id === selected.id}
@@ -465,26 +813,44 @@ export function ProfilesPage() {
         <Panel
           title={t("pages.profiles.detailTitle")}
           icon={<ShieldCheck size={15} />}
-          action={<StatusPill tone={selected.status} />}
+          action={<StatusPill tone={selected?.status || "idle"} />}
         >
-          <DetailRow label="model" value={<span className="font-mono">{selected.model}</span>} />
-          <DetailRow label="model_provider" value={<span className="font-mono">{selected.providerId}</span>} />
-          <DetailRow label="sandbox" value={selected.sandbox} />
-          <DetailRow label="approval" value={selected.approval} />
-          <DetailRow label="network" value={selected.network} />
-          <DetailRow label="mcp_refs" value={selected.mcpRefs.join(", ")} />
+          <DetailRow label="model" value={<span className="font-mono">{selected?.model || "-"}</span>} />
+          <DetailRow label="model_provider" value={<span className="font-mono">{selected?.providerId || "-"}</span>} />
+          <DetailRow label="sandbox" value={selected?.sandbox || "-"} />
+          <DetailRow label="approval" value={selected?.approval || "-"} />
+          <DetailRow label="network" value={selected?.network || "-"} />
+          <DetailRow label="mcp_refs" value={selected?.mcpRefs.join(", ") || "-"} />
           <div className="mt-4 flex flex-wrap gap-2">
-            <ToolbarButton icon={<CheckCircle2 size={13} />} onClick={() => show("success", t("feedback.profileActivated", { name: selected.name }))}>{t("actions.setActive")}</ToolbarButton>
-            <ToolbarButton icon={<Copy size={13} />} onClick={() => show("info", t("feedback.profileCopied", { name: selected.name }))}>{t("actions.duplicate")}</ToolbarButton>
+            <ToolbarButton icon={<CheckCircle2 size={13} />} disabled={!selected || selected.isActive} onClick={() => void previewSetActive()}>{t("actions.setActive")}</ToolbarButton>
+            <ToolbarButton icon={<Copy size={13} />} onClick={() => show("info", t("feedback.profileCopied", { name: selected?.name || "-" }))}>{t("actions.duplicate")}</ToolbarButton>
             <ConfirmButton
               idleLabel={t("actions.delete")}
               confirmLabel={t("actions.confirmDelete")}
-              disabled={selected.isActive}
+              disabled={!selected || selected.isActive}
               onConfirm={() => show("warning", t("feedback.dangerBlocked"))}
             />
           </div>
         </Panel>
       </div>
+      {/* MCP 子区块:展示当前 profile 引用的 MCP server 列表,只读 */}
+      {selected?.mcpRefs?.length ? (
+        <div className="cb-surface p-4">
+          <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-ink-700">
+            <Puzzle size={14} /> {t("pages.profiles.mcpSubsection")}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {selected.mcpRefs.map((ref) => (
+              <span
+                key={ref}
+                className="rounded-md border border-ink-900/10 bg-white/60 px-2 py-1 text-[11px] text-ink-700"
+              >
+                {ref}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </PageShell>
   );
 }
@@ -494,11 +860,44 @@ export function ProvidersPage() {
   const { notice, show } = useNotice();
   const [providers, setProviders] = useState<ProviderView[]>(mockProviders);
   const [selectedId, setSelectedId] = useState(mockProviders[0].id);
+  const [configPath, setConfigPath] = useState("~/.codex/config.toml");
   const [creating, setCreating] = useState(false);
   const [draft, setDraft] = useState<ProviderDraft>(EMPTY_PROVIDER_DRAFT);
+  const [pendingChange, setPendingChange] = useState<PendingProviderChange | null>(null);
+  const [writeBusy, setWriteBusy] = useState(false);
   const selected = providers.find((item) => item.id === selectedId) || providers[0];
 
-  const createProvider = () => {
+  const refreshConfigSnapshot = async () => {
+    const result = await invokeCmd<ConfigSnapshotView>("config_snapshot");
+    if (result.ok) {
+      const nextProviders = result.data.providers.length > 0 ? result.data.providers : mockProviders;
+      setProviders(nextProviders);
+      setConfigPath(result.data.configPath);
+      setSelectedId(nextProviders[0]?.id || "");
+    } else {
+      show("warning", result.error);
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    void invokeCmd<ConfigSnapshotView>("config_snapshot").then((result) => {
+      if (cancelled) return;
+      if (result.ok) {
+        const nextProviders = result.data.providers.length > 0 ? result.data.providers : mockProviders;
+        setProviders(nextProviders);
+        setConfigPath(result.data.configPath);
+        setSelectedId(nextProviders[0]?.id || "");
+      } else {
+        show("warning", result.error);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const createProvider = async () => {
     const trimmedName = draft.name.trim();
     const trimmedBaseUrl = draft.baseUrl.trim();
     const trimmedEnvKey = draft.envKey.trim();
@@ -526,22 +925,47 @@ export function ProvidersPage() {
       suffix += 1;
     }
 
-    const nextProvider: ProviderView = {
+    const change: ConfigChangeRequest = {
+      type: "add_provider",
       id: nextId,
-      name: trimmedName,
       kind: draft.kind,
       baseUrl: trimmedBaseUrl,
       wireApi: draft.wireApi,
       envKey: trimmedEnvKey,
-      status: "idle",
       models,
     };
 
-    setProviders((current) => [...current, nextProvider]);
-    setSelectedId(nextProvider.id);
-    setDraft(EMPTY_PROVIDER_DRAFT);
-    setCreating(false);
-    show("success", t("feedback.providerCreated", { name: nextProvider.name }));
+    const result = await invokeCmd<ConfigChangePreviewView>("config_change_preview", { change });
+    if (result.ok) {
+      setPendingChange({ change, preview: result.data, providerName: trimmedName });
+      setCreating(false);
+      show("info", t("feedback.previewDiff"));
+    } else {
+      show("warning", result.error);
+    }
+  };
+
+  const applyPendingProvider = async () => {
+    if (!pendingChange) return;
+    setWriteBusy(true);
+    const result = await invokeCmd<ApplyConfigChangeResultView>("config_change_apply", {
+      request: {
+        change: pendingChange.change,
+        expectedHash: pendingChange.preview.expectedHash,
+      },
+    });
+    setWriteBusy(false);
+    if (result.ok) {
+      setDraft(EMPTY_PROVIDER_DRAFT);
+      setPendingChange(null);
+      show("success", t("feedback.providerCreated", { name: pendingChange.providerName }));
+      await refreshConfigSnapshot();
+      if ("id" in pendingChange.change) {
+        setSelectedId(pendingChange.change.id);
+      }
+    } else {
+      show("warning", result.error);
+    }
   };
 
   return (
@@ -573,6 +997,49 @@ export function ProvidersPage() {
           onCreate={createProvider}
         />
       )}
+      {pendingChange && (
+        <Panel title={t("pages.providers.writePreviewTitle")} icon={<GitCompare size={15} />}>
+          <SummaryStrip
+            items={[
+              { label: t("fields.configPath"), value: pendingChange.preview.configPath },
+              { label: t("diff.insertions"), value: String(pendingChange.preview.insertions), tone: "ok" },
+              { label: t("diff.deletions"), value: String(pendingChange.preview.deletions), tone: pendingChange.preview.deletions > 0 ? "warn" : "idle" },
+            ]}
+          />
+          <div className="mt-4 max-h-[320px] overflow-auto rounded-md bg-[#14171A] p-4 font-mono text-[12px] leading-[1.7] text-white/88 shadow-inner">
+            {pendingChange.preview.diff.map((line, index) => (
+              <DiffLine
+                key={`${index}-${line.kind}`}
+                line={{
+                  id: String(index),
+                  kind: line.kind,
+                  content: line.content,
+                }}
+              />
+            ))}
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <ToolbarButton
+              icon={<Save size={13} />}
+              variant="primary"
+              disabled={writeBusy}
+              onClick={() => void applyPendingProvider()}
+            >
+              {t("actions.confirmWrite")}
+            </ToolbarButton>
+            <ToolbarButton
+              icon={<RotateCcw size={13} />}
+              disabled={writeBusy}
+              onClick={() => setPendingChange(null)}
+            >
+              {t("actions.cancel")}
+            </ToolbarButton>
+          </div>
+        </Panel>
+      )}
+      <Panel title={t("pages.providers.sourceTitle")} icon={<GitCompare size={15} />}>
+        <DetailRow label={t("fields.configPath")} value={<span className="font-mono break-all">{configPath}</span>} />
+      </Panel>
       <div className="grid grid-cols-[minmax(260px,0.88fr)_minmax(0,1.35fr)] gap-4">
         <Panel title={t("pages.providers.listTitle")} icon={<Server size={15} />}>
           <div className="flex flex-col gap-2">
@@ -591,19 +1058,38 @@ export function ProvidersPage() {
         <Panel
           title={t("pages.providers.detailTitle")}
           icon={<KeyRound size={15} />}
-          action={<ToolbarButton icon={<TestTube2 size={13} />} onClick={() => show("success", t("feedback.connectionTested", { name: selected.name }))}>{t("actions.testConnection")}</ToolbarButton>}
+          action={<ToolbarButton icon={<TestTube2 size={13} />} disabled={!selected} onClick={() => show("success", t("feedback.connectionTested", { name: selected?.name || "-" }))}>{t("actions.testConnection")}</ToolbarButton>}
         >
-          <DetailRow label={t("fields.kind")} value={t(`providerKind.${selected.kind}`)} />
-          <DetailRow label="base_url" value={<span className="font-mono break-all">{selected.baseUrl}</span>} />
-          <DetailRow label="wire_api" value={<span className="font-mono">{selected.wireApi}</span>} />
-          <DetailRow label="env" value={<SecretText value={selected.envKey} />} />
-          <DetailRow label={t("fields.models")} value={selected.models.join(", ")} />
+          <DetailRow label={t("fields.kind")} value={selected ? t(`providerKind.${selected.kind}`) : "-"} />
+          <DetailRow label="base_url" value={<span className="font-mono break-all">{selected?.baseUrl || "-"}</span>} />
+          <DetailRow label="wire_api" value={<span className="font-mono">{selected?.wireApi || "-"}</span>} />
+          <DetailRow label="env" value={selected ? <SecretText value={selected.envKey} /> : "-"} />
+          <DetailRow label={t("fields.models")} value={selected?.models.join(", ") || "-"} />
           <div className="mt-4 flex flex-wrap gap-2">
-            <ToolbarButton icon={<Copy size={13} />} onClick={() => show("info", t("feedback.providerCopied", { name: selected.name }))}>{t("actions.copyConfig")}</ToolbarButton>
+            <ToolbarButton icon={<Copy size={13} />} disabled={!selected} onClick={() => show("info", t("feedback.providerCopied", { name: selected?.name || "-" }))}>{t("actions.copyConfig")}</ToolbarButton>
             <ToolbarButton icon={<GitCompare size={13} />} onClick={() => show("info", t("feedback.previewDiff"))}>{t("actions.previewDiff")}</ToolbarButton>
           </div>
         </Panel>
       </div>
+      {/* Network 子区块:展示 provider 自身的网络特征,只读 */}
+      {selected ? (
+        <div className="cb-surface p-4">
+          <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-ink-700">
+            <Network size={14} /> {t("pages.providers.networkSubsection")}
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-[11px] text-ink-600">
+            <span>
+              {t("fields.kind")}: <span className="font-mono">{selected.kind}</span>
+            </span>
+            <span>
+              {t("fields.baseUrl")}: <span className="font-mono break-all">{selected.baseUrl || "-"}</span>
+            </span>
+            <span>
+              wire_api: <span className="font-mono">{selected.wireApi}</span>
+            </span>
+          </div>
+        </div>
+      ) : null}
     </PageShell>
   );
 }
@@ -611,11 +1097,63 @@ export function ProvidersPage() {
 export function GatewayPage() {
   const { t } = useTranslation();
   const { notice, show } = useNotice();
+  const [openCodex, setOpenCodex] = useState<OpenCodexStatus | null>(null);
+  const [openCodexBusy, setOpenCodexBusy] = useState(false);
   const [selectedId, setSelectedId] = useState(mockGateways[0].id);
   const [running, setRunning] = useState<Record<string, boolean>>({});
   const selected = mockGateways.find((item) => item.id === selectedId) || mockGateways[0];
   const isRunning = !!running[selected.id];
   const status: StatusTone = isRunning ? "running" : selected.status;
+  const openCodexTone: StatusTone = !openCodex?.exists
+    ? "fail"
+    : openCodex.running
+      ? "running"
+      : "idle";
+
+  const refreshOpenCodex = async () => {
+    const result = await invokeCmd<OpenCodexStatus>("opencodex_status");
+    if (result.ok) {
+      setOpenCodex(result.data);
+    } else {
+      show("warning", result.error);
+    }
+  };
+
+  const runOpenCodexAction = async (
+    command:
+      | "opencodex_start"
+      | "opencodex_start_lan"
+      | "opencodex_stop"
+      | "opencodex_restart"
+      | "opencodex_restart_lan"
+      | "opencodex_open_logs",
+    successKey: string
+  ) => {
+    setOpenCodexBusy(true);
+    const result = await invokeCmd<OpenCodexStatus>(command);
+    setOpenCodexBusy(false);
+    if (result.ok) {
+      setOpenCodex(result.data);
+      show("success", t(successKey));
+    } else {
+      show("warning", result.error);
+      void refreshOpenCodex();
+    }
+  };
+
+  const openOpenCodexUrl = async (kind: "local" | "mobile") => {
+    const result = await invokeCmd<OpenCodexStatus>("opencodex_open_url", { kind });
+    if (result.ok) {
+      setOpenCodex(result.data);
+      show("info", t("feedback.openCodexUrlOpened"));
+    } else {
+      show("warning", result.error);
+    }
+  };
+
+  useEffect(() => {
+    void refreshOpenCodex();
+  }, []);
 
   return (
     <PageShell
@@ -624,6 +1162,121 @@ export function GatewayPage() {
       notice={notice}
       action={<ToolbarButton icon={<Plus size={13} />} variant="primary" onClick={() => show("info", t("feedback.gatewayPreset"))}>{t("actions.importPreset")}</ToolbarButton>}
     >
+      <Panel
+        title={t("pages.gateway.openCodexTitle")}
+        icon={<Cable size={15} />}
+        action={<StatusPill tone={openCodexTone} />}
+      >
+        <SummaryStrip
+          items={[
+            {
+              label: t("fields.source"),
+              value: openCodex?.exists ? t("common.detected") : t("common.notFound"),
+              tone: openCodex?.exists ? "ok" : "fail",
+            },
+            {
+              label: t("fields.status"),
+              value: openCodex?.running ? t("status.running") : t("status.idle"),
+              tone: openCodexTone,
+            },
+            {
+              label: "health",
+              value: openCodex?.healthOk ? "200" : openCodex?.healthStatus ? String(openCodex.healthStatus) : "-",
+              tone: openCodex?.healthOk ? "ok" : "idle",
+            },
+          ]}
+        />
+        <div className="mt-4">
+          <DetailRow label={t("fields.sourcePath")} value={<span className="font-mono break-all">{openCodex?.sourcePath || "-"}</span>} />
+          <DetailRow label="host / port" value={`${openCodex?.host || "-"}:${openCodex?.port || "-"}`} />
+          <DetailRow label={t("fields.localUrl")} value={<span className="font-mono break-all">{openCodex?.localUrl || "-"}</span>} />
+          <DetailRow
+            label={t("fields.mobileUrl")}
+            value={
+              <span className="font-mono break-all">
+                {openCodex?.mobileUrl || t("common.none")}
+              </span>
+            }
+          />
+          <DetailRow
+            label={t("fields.lanAccess")}
+            value={openCodex?.lanAccessEnabled ? t("common.enabled") : t("common.disabled")}
+          />
+          <DetailRow label="CODEX_HOME" value={<span className="font-mono break-all">{openCodex?.codexHome || "-"}</span>} />
+          <DetailRow label={t("fields.sharedCodexHome")} value={<span className="font-mono break-all">{openCodex?.sharedCodexHome || "-"}</span>} />
+          <DetailRow label={t("fields.health")} value={<span className="font-mono break-all">{openCodex?.healthEndpoint || "-"}</span>} />
+          <DetailRow label={t("fields.logPath")} value={<span className="font-mono break-all">{openCodex?.logPath || "-"}</span>} />
+          <DetailRow label={t("fields.password")} value={openCodex?.authPasswordConfigured ? t("common.configured") : t("common.notConfigured")} />
+          {openCodex?.lastError && (
+            <DetailRow label={t("fields.lastError")} value={<span className="text-status-fail">{openCodex.lastError}</span>} />
+          )}
+        </div>
+        <div className="mt-3 rounded-md border border-status-warn/25 bg-status-warn/10 px-3 py-2 text-[12px] leading-[1.55] text-status-warn">
+          {t("pages.gateway.lanWarning")}
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <ToolbarButton
+            icon={<Play size={13} />}
+            variant="primary"
+            disabled={openCodexBusy || !openCodex?.exists || openCodex.running}
+            onClick={() => void runOpenCodexAction("opencodex_start", "feedback.openCodexStarted")}
+          >
+            {t("actions.start")}
+          </ToolbarButton>
+          <ToolbarButton
+            icon={<Globe size={13} />}
+            disabled={openCodexBusy || !openCodex?.exists || openCodex.running || !openCodex.authPasswordConfigured}
+            onClick={() => void runOpenCodexAction("opencodex_start_lan", "feedback.openCodexLanStarted")}
+          >
+            {t("actions.startLan")}
+          </ToolbarButton>
+          <ToolbarButton
+            icon={<Square size={13} />}
+            disabled={openCodexBusy || !openCodex?.managed}
+            onClick={() => void runOpenCodexAction("opencodex_stop", "feedback.openCodexStopped")}
+          >
+            {t("actions.stop")}
+          </ToolbarButton>
+          <ToolbarButton
+            icon={<RotateCcw size={13} />}
+            disabled={openCodexBusy || !openCodex?.exists}
+            onClick={() => void runOpenCodexAction("opencodex_restart", "feedback.openCodexRestarted")}
+          >
+            {t("actions.restart")}
+          </ToolbarButton>
+          <ToolbarButton
+            icon={<RotateCcw size={13} />}
+            disabled={openCodexBusy || !openCodex?.exists || !openCodex.authPasswordConfigured}
+            onClick={() => void runOpenCodexAction("opencodex_restart_lan", "feedback.openCodexLanStarted")}
+          >
+            {t("actions.restartLan")}
+          </ToolbarButton>
+          <ToolbarButton
+            icon={<Globe size={13} />}
+            disabled={!openCodex?.localUrl}
+            onClick={() => void openOpenCodexUrl("local")}
+          >
+            {t("actions.openLocalUrl")}
+          </ToolbarButton>
+          <ToolbarButton
+            icon={<Globe size={13} />}
+            disabled={!openCodex?.mobileUrlReachable}
+            onClick={() => void openOpenCodexUrl("mobile")}
+          >
+            {t("actions.openMobileUrl")}
+          </ToolbarButton>
+          <ToolbarButton
+            icon={<Activity size={13} />}
+            disabled={openCodexBusy}
+            onClick={() => void runOpenCodexAction("opencodex_open_logs", "feedback.openLogs")}
+          >
+            {t("actions.openLogs")}
+          </ToolbarButton>
+          <ToolbarButton icon={<TestTube2 size={13} />} disabled={openCodexBusy} onClick={() => void refreshOpenCodex()}>
+            {t("actions.refresh")}
+          </ToolbarButton>
+        </div>
+      </Panel>
       <div className="grid grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)] gap-4">
         <Panel title={t("pages.gateway.presetsTitle")} icon={<Cable size={15} />}>
           <div className="flex flex-col gap-2">
@@ -678,160 +1331,246 @@ export function GatewayPage() {
           </div>
         </Panel>
       </div>
+      {/* Config Diff 子区块:展示 Gateway 启动可能改的 config 范围占位,M3 接入真实 diff */}
+      <div className="cb-surface p-4">
+        <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-ink-700">
+          <GitCompare size={14} /> {t("pages.gateway.diffSubsection")}
+        </div>
+        <div className="rounded-md bg-ink-900/5 p-3 font-mono text-[11px] leading-[1.7] text-ink-700">
+          <div className="text-ink-400"># Gateway 启动不会修改 ~/.codex/config.toml</div>
+          <div className="text-ink-400"># Gateway 只会改 ~/.codex/codex-box/opencodex/runtime 与 logs</div>
+          <div>
+            <span className="text-[#34C759]">+ </span>
+            CODEX_HOME={`"$HOME/.codex"`}
+          </div>
+          <div>
+            <span className="text-[#34C759]">+ </span>
+            HOST={"127.0.0.1"} PORT={"3737"}
+          </div>
+          <div className="text-ink-400"># 实际写入流程(draft → backup → diff → confirm → atomic write)M3 接入</div>
+        </div>
+      </div>
     </PageShell>
   );
 }
 
-export function McpServersPage() {
+export function MobileAccessPage() {
   const { t } = useTranslation();
   const { notice, show } = useNotice();
-  const [selectedId, setSelectedId] = useState(mockMcpServers[0].id);
-  const [enabled, setEnabled] = useState<Record<string, boolean>>(
-    Object.fromEntries(mockMcpServers.map((server) => [server.id, server.enabled]))
-  );
-  const selected = mockMcpServers.find((item) => item.id === selectedId) || mockMcpServers[0];
+  const [status, setStatus] = useState<OpenCodexStatus | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const result = await invokeCmd<OpenCodexStatus>("opencodex_status");
+    setLoading(false);
+    if (result.ok) {
+      setStatus(result.data);
+    } else {
+      setError(result.error);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const onStart = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const result = await invokeCmd<OpenCodexStatus>("opencodex_start");
+    setLoading(false);
+    if (result.ok) {
+      setStatus(result.data);
+      show("success", t("feedback.gatewayStarted"));
+    } else {
+      setError(result.error);
+      show("warning", result.error);
+    }
+  }, [show, t]);
+
+  const onStartLan = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    const result = await invokeCmd<OpenCodexStatus>("opencodex_start_lan");
+    setLoading(false);
+    if (result.ok) {
+      setStatus(result.data);
+      show("success", t("feedback.gatewayStartedLan"));
+    } else {
+      setError(result.error);
+      show("warning", result.error);
+    }
+  }, [show, t]);
+
+  const onOpenMobile = useCallback(async () => {
+    setError(null);
+    const result = await invokeCmd<OpenCodexStatus>("opencodex_open_url", { kind: "mobile" });
+    if (!result.ok) {
+      setError(result.error);
+      show("warning", result.error);
+    }
+  }, [show]);
+
+  const onOpenLocal = useCallback(async () => {
+    setError(null);
+    const result = await invokeCmd<OpenCodexStatus>("opencodex_open_url", { kind: null });
+    if (!result.ok) {
+      setError(result.error);
+      show("warning", result.error);
+    }
+  }, [show]);
 
   return (
     <PageShell
-      title={t("pages.mcp.title")}
-      subtitle={t("pages.mcp.subtitle")}
+      title={t("pages.mobileAccess.title")}
+      subtitle={t("pages.mobileAccess.subtitle")}
       notice={notice}
-      action={<ToolbarButton icon={<Plus size={13} />} variant="primary" onClick={() => show("info", t("feedback.mcpCreate"))}>{t("actions.addMcp")}</ToolbarButton>}
+      action={
+        <div className="flex flex-wrap items-center gap-2">
+          <ToolbarButton icon={<RotateCcw size={13} />} onClick={() => void refresh()} disabled={loading}>
+            {t("actions.refresh")}
+          </ToolbarButton>
+          {status?.running ? (
+            <ToolbarButton icon={<Square size={13} />} onClick={onStartLan} disabled={loading}>
+              {t("actions.startLan")}
+            </ToolbarButton>
+          ) : (
+            <ToolbarButton icon={<Play size={13} />} variant="primary" onClick={onStart} disabled={loading}>
+              {t("actions.startLocal")}
+            </ToolbarButton>
+          )}
+        </div>
+      }
     >
       <div className="grid grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)] gap-4">
-        <Panel title={t("pages.mcp.listTitle")} icon={<Puzzle size={15} />}>
-          <div className="flex flex-col gap-2">
-            {mockMcpServers.map((server) => (
-              <ListButton
-                key={server.id}
-                active={server.id === selected.id}
-                title={server.name}
-                subtitle={`${server.transport} / ${enabled[server.id] ? t("common.enabled") : t("common.disabled")}`}
-                right={<StatusPill tone={server.status} />}
-                onClick={() => setSelectedId(server.id)}
-              />
-            ))}
+        <Panel title={t("pages.mobileAccess.qrTitle")} icon={<Smartphone size={15} />}>
+          {status?.mobileUrl ? (
+            <div className="flex flex-col items-center gap-3 py-4">
+              {/* 二维码占位:M3 接入 qrcode.react 后替换 */}
+              <div className="flex h-40 w-40 items-center justify-center rounded-md border border-ink-900/10 bg-white/70 text-[11px] text-ink-500">
+                {t("pages.mobileAccess.qrPlaceholder")}
+              </div>
+              <code className="break-all rounded bg-ink-900/5 px-2 py-1 text-[12px] text-ink-700">
+                {status.mobileUrl}
+              </code>
+            </div>
+          ) : (
+            <div className="py-6 text-center text-[12px] text-ink-500">
+              {t("pages.mobileAccess.lanOffHint")}
+            </div>
+          )}
+          <div className="mt-2 flex flex-wrap gap-2">
+            <ToolbarButton icon={<Cable size={13} />} onClick={onOpenLocal}>
+              {t("actions.openLocalUrl")}
+            </ToolbarButton>
+            <ToolbarButton icon={<Smartphone size={13} />} onClick={onOpenMobile} disabled={!status?.mobileUrlReachable}>
+              {t("actions.openMobileUrl")}
+            </ToolbarButton>
           </div>
         </Panel>
-        <Panel title={t("pages.mcp.detailTitle")} icon={<Server size={15} />}>
-          <DetailRow label={t("fields.transport")} value={selected.transport} />
-          <DetailRow label={selected.transport === "stdio" ? "command" : "url"} value={<span className="font-mono break-all">{selected.commandOrUrl}</span>} />
-          <DetailRow label={t("fields.enabled")} value={enabled[selected.id] ? t("common.enabled") : t("common.disabled")} />
-          <DetailRow label="env_refs" value={selected.envRefs.length ? selected.envRefs.join(", ") : t("common.none")} />
-          <div className="mt-4 flex flex-wrap gap-2">
-            <ToolbarButton
-              icon={<Power size={13} />}
-              onClick={() => {
-                setEnabled((current) => ({ ...current, [selected.id]: !current[selected.id] }));
-                show("success", t("feedback.mcpToggled", { name: selected.name }));
-              }}
-            >
-              {enabled[selected.id] ? t("actions.disable") : t("actions.enable")}
-            </ToolbarButton>
-            <ToolbarButton icon={<TestTube2 size={13} />} onClick={() => show("success", t("feedback.mcpTested", { name: selected.name }))}>{t("actions.test")}</ToolbarButton>
-          </div>
+        <Panel title={t("pages.mobileAccess.infoTitle")} icon={<ShieldCheck size={15} />}>
+          <DetailRow label={t("fields.localUrl")} value={<span className="font-mono">{status?.localUrl ?? t("common.unknown")}</span>} />
+          <DetailRow
+            label={t("fields.lanUrl")}
+            value={
+              status?.lanUrls?.length
+                ? status.lanUrls.map((u) => <div key={u} className="font-mono">{u}</div>)
+                : t("common.none")
+            }
+          />
+          <DetailRow
+            label={t("fields.lanPassword")}
+            value={status?.authPasswordConfigured ? t("common.configured") : t("common.notConfigured")}
+          />
+          <DetailRow label={t("fields.running")} value={status?.running ? t("common.running") : t("common.stopped")} />
+          {error ? (
+            <div className="mt-3 rounded-md border border-[#FF9A9A]/40 bg-[#FFD6D6]/40 px-3 py-2 text-[12px] text-[#9B2C2C]">
+              {error}
+            </div>
+          ) : null}
         </Panel>
       </div>
     </PageShell>
   );
 }
 
-export function NetworkPage() {
+export function CodexRuntimePage() {
   const { t } = useTranslation();
-  const { notice, show } = useNotice();
-  const [selectedId, setSelectedId] = useState(mockNetworkRoutes[0].id);
-  const [latencies, setLatencies] = useState<Record<string, number | null>>(
-    Object.fromEntries(mockNetworkRoutes.map((route) => [route.id, route.latencyMs]))
-  );
-  const selected = mockNetworkRoutes.find((item) => item.id === selectedId) || mockNetworkRoutes[0];
+  const { notice } = useNotice();
+  const [status, setStatus] = useState<OpenCodexStatus | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    const result = await invokeCmd<OpenCodexStatus>("opencodex_status");
+    setLoading(false);
+    if (result.ok) {
+      setStatus(result.data);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
 
   return (
     <PageShell
-      title={t("pages.network.title")}
-      subtitle={t("pages.network.subtitle")}
+      title={t("pages.codexRuntime.title")}
+      subtitle={t("pages.codexRuntime.subtitle")}
       notice={notice}
-      action={<ToolbarButton icon={<Plus size={13} />} variant="primary" onClick={() => show("info", t("feedback.routeCreate"))}>{t("actions.newRoute")}</ToolbarButton>}
+      action={
+        <ToolbarButton icon={<RotateCcw size={13} />} onClick={() => void refresh()} disabled={loading}>
+          {t("actions.refresh")}
+        </ToolbarButton>
+      }
     >
-      <div className="grid grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)] gap-4">
-        <Panel title={t("pages.network.routesTitle")} icon={<Network size={15} />}>
-          <div className="flex flex-col gap-2">
-            {mockNetworkRoutes.map((route) => (
-              <ListButton
-                key={route.id}
-                active={route.id === selected.id}
-                title={route.name}
-                subtitle={`${t(`networkKind.${route.kind}`)} / ${route.target}`}
-                right={<StatusPill tone={route.status} />}
-                onClick={() => setSelectedId(route.id)}
-              />
-            ))}
-          </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <Panel title={t("pages.codexRuntime.checkoutTitle")} icon={<Server size={15} />}>
+          <DetailRow
+            label={t("fields.opencodexSource")}
+            value={<span className="font-mono break-all">{status?.sourcePath ?? t("common.unknown")}</span>}
+          />
+          <DetailRow
+            label={t("fields.exists")}
+            value={status?.exists ? t("common.found") : t("common.missing")}
+          />
+          <DetailRow
+            label={t("fields.configYaml")}
+            value={<span className="font-mono break-all">{status?.configYamlPath ?? t("common.unknown")}</span>}
+          />
+          <DetailRow
+            label={t("fields.configExists")}
+            value={status?.configExists ? t("common.found") : t("common.missing")}
+          />
         </Panel>
-        <Panel title={t("pages.network.testTitle")} icon={<Globe size={15} />}>
-          <DetailRow label={t("fields.kind")} value={t(`networkKind.${selected.kind}`)} />
-          <DetailRow label={t("fields.target")} value={<span className="font-mono break-all">{selected.target}</span>} />
-          <DetailRow label={t("fields.latency")} value={latencies[selected.id] ? `${latencies[selected.id]} ms` : t("common.notTested")} />
-          <div className="mt-4 flex flex-wrap gap-2">
-            <ToolbarButton
-              icon={<TestTube2 size={13} />}
-              variant="primary"
-              onClick={() => {
-                const nextLatency = selected.kind === "direct" ? 118 : 236;
-                setLatencies((current) => ({ ...current, [selected.id]: nextLatency }));
-                show("success", t("feedback.networkTested", { name: selected.name, ms: nextLatency }));
-              }}
-            >
-              {t("actions.testConnectivity")}
-            </ToolbarButton>
-          </div>
-        </Panel>
-      </div>
-    </PageShell>
-  );
-}
-
-export function ConfigDiffPage() {
-  const { t } = useTranslation();
-  const { notice, show } = useNotice();
-  const [stage, setStage] = useState<"draft" | "backup" | "diff" | "ready">("diff");
-
-  return (
-    <PageShell
-      title={t("pages.configDiff.title")}
-      subtitle={t("pages.configDiff.subtitle")}
-      notice={notice}
-      action={<ToolbarButton icon={<Save size={13} />} variant="primary" onClick={() => show("warning", t("feedback.writeBlocked"))}>{t("actions.saveSafely")}</ToolbarButton>}
-    >
-      <div className="grid grid-cols-[minmax(260px,0.82fr)_minmax(0,1.42fr)] gap-4">
-        <Panel title={t("pages.configDiff.flowTitle")} icon={<ShieldCheck size={15} />}>
-          {(["draft", "backup", "diff", "ready"] as const).map((item, index) => (
-            <button
-              key={item}
-              className={`mb-2 flex w-full items-center gap-3 rounded-md border px-3 py-2 text-left ${
-                stage === item ? "border-[#BBD7E8] bg-[#D7E8F2]/80" : "border-white/60 bg-white/35"
-              }`}
-              onClick={() => setStage(item)}
-            >
-              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-white/70 text-[11px] font-semibold text-ink-700">
-                {index + 1}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[13px] font-medium text-ink-800">{t(`diffFlow.${item}.title`)}</span>
-                <span className="block truncate text-[11px] text-ink-500">{t(`diffFlow.${item}.desc`)}</span>
-              </span>
-            </button>
-          ))}
-        </Panel>
-        <Panel title={t("pages.configDiff.diffTitle")} icon={<GitCompare size={15} />}>
-          <div className="rounded-md bg-[#14171A] p-4 font-mono text-[12px] leading-[1.7] text-white/88 shadow-inner">
-            {mockDiffLines.map((line) => (
-              <DiffLine key={line.id} line={line} />
-            ))}
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <ToolbarButton icon={<Copy size={13} />} onClick={() => show("success", t("feedback.diffCopied"))}>{t("actions.copyDiff")}</ToolbarButton>
-            <ToolbarButton icon={<RotateCcw size={13} />} onClick={() => show("warning", t("feedback.rollbackConfirm"))}>{t("actions.prepareRollback")}</ToolbarButton>
-          </div>
+        <Panel title={t("pages.codexRuntime.sharedTitle")} icon={<Cpu size={15} />}>
+          <DetailRow
+            label={t("fields.codexHome")}
+            value={<span className="font-mono break-all">{status?.codexHome ?? t("common.unknown")}</span>}
+          />
+          <DetailRow
+            label={t("fields.runtimeDir")}
+            value={<span className="font-mono break-all">{status?.runtimeDir ?? t("common.unknown")}</span>}
+          />
+          <DetailRow
+            label={t("fields.logPath")}
+            value={<span className="font-mono break-all">{status?.logPath ?? t("common.unknown")}</span>}
+          />
+          <DetailRow
+            label={t("fields.healthEndpoint")}
+            value={<span className="font-mono break-all">{status?.healthEndpoint ?? t("common.unknown")}</span>}
+          />
+          <DetailRow
+            label={t("fields.health")}
+            value={
+              status?.healthOk
+                ? `${t("common.ok")}${status.healthStatus ? ` (${status.healthStatus})` : ""}`
+                : t("common.notReady")
+            }
+          />
         </Panel>
       </div>
     </PageShell>

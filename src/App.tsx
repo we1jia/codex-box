@@ -7,11 +7,10 @@ import { useTranslation } from "react-i18next";
 import { Languages, Search, Settings as SettingsIcon } from "lucide-react";
 import { setLanguage } from "@/lib/i18n";
 import {
-  ConfigDiffPage,
+  CodexRuntimePage,
   DiagnosticsPage,
   GatewayPage,
-  McpServersPage,
-  NetworkPage,
+  MobileAccessPage,
   ProfilesPage,
   ProvidersPage,
   SettingsPage,
@@ -35,18 +34,16 @@ function ActivePage() {
   const activePage = useUIStore((s) => s.activePage);
 
   switch (activePage) {
+    case "gateway":
+      return <GatewayPage />;
+    case "mobile_access":
+      return <MobileAccessPage />;
+    case "codex_runtime":
+      return <CodexRuntimePage />;
     case "profiles":
       return <ProfilesPage />;
     case "providers":
       return <ProvidersPage />;
-    case "gateway":
-      return <GatewayPage />;
-    case "mcp":
-      return <McpServersPage />;
-    case "network":
-      return <NetworkPage />;
-    case "config_diff":
-      return <ConfigDiffPage />;
     case "diagnostics":
       return <DiagnosticsPage />;
     case "settings":

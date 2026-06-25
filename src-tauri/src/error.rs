@@ -20,6 +20,9 @@ pub enum AppError {
 
     #[error("Invalid UTF-8 in {0}")]
     InvalidUtf8(String),
+
+    #[error("Command failed: {0}")]
+    Command(String),
 }
 
 impl serde::Serialize for AppError {

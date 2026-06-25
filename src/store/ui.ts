@@ -14,23 +14,21 @@ export const clampSidebarWidth = (w: number) =>
 
 export type PageId =
   | "dashboard"
+  | "gateway"
+  | "mobile_access"
+  | "codex_runtime"
   | "profiles"
   | "providers"
-  | "gateway"
-  | "mcp"
-  | "network"
-  | "config_diff"
   | "diagnostics"
   | "settings";
 
 export const PAGE_IDS: PageId[] = [
   "dashboard",
+  "gateway",
+  "mobile_access",
+  "codex_runtime",
   "profiles",
   "providers",
-  "gateway",
-  "mcp",
-  "network",
-  "config_diff",
   "diagnostics",
   "settings",
 ];

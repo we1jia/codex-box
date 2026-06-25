@@ -1,12 +1,11 @@
 {
   "nav": {
-    "dashboard": "Dashboard",
+    "dashboard": "Overview",
+    "gateway": "Gateway",
+    "mobile_access": "Mobile Access",
+    "codex_runtime": "Codex Runtime",
     "profiles": "Profiles",
     "providers": "Providers",
-    "gateway": "Gateway",
-    "mcp": "MCP Servers",
-    "network": "Network",
-    "config_diff": "Config Diff",
     "diagnostics": "Diagnostics",
     "settings": "Settings"
   },
@@ -35,7 +34,18 @@
     "disabled": "Disabled",
     "none": "None",
     "notTested": "Not tested",
-    "redacted": "Redacted"
+    "redacted": "Redacted",
+    "detected": "Detected",
+    "notFound": "Not found",
+    "configured": "Configured",
+    "notConfigured": "Not configured",
+    "running": "Running",
+    "stopped": "Stopped",
+    "ok": "OK",
+    "notReady": "Not ready",
+    "found": "Found",
+    "missing": "Missing",
+    "unknown": "Unknown"
   },
   "actions": {
     "newProfile": "New Profile",
@@ -64,7 +74,15 @@
     "rerunAll": "Rerun All",
     "switchLanguage": "Switch Language",
     "cancel": "Cancel",
-    "create": "Create"
+    "create": "Create",
+    "restart": "Restart",
+    "refresh": "Refresh",
+    "openLocalUrl": "Open Local URL",
+    "openMobileUrl": "Open Mobile URL",
+    "startLocal": "Start Local",
+    "startLan": "Start LAN",
+    "restartLan": "Restart LAN",
+    "confirmWrite": "Confirm Write"
   },
   "summary": {
     "totalProfiles": "Profiles",
@@ -86,7 +104,27 @@
     "target": "Target",
     "latency": "Latency",
     "name": "Name",
-    "envKey": "Environment variable"
+    "envKey": "Environment variable",
+    "source": "Source",
+    "sourcePath": "Source path",
+    "localUrl": "Local URL",
+    "mobileUrl": "Mobile URL",
+    "lanUrl": "LAN URL",
+    "lanAccess": "LAN access",
+    "lanPassword": "LAN password",
+    "sharedCodexHome": "Shared CODEX_HOME",
+    "password": "Access password",
+    "lastError": "Last error",
+    "configPath": "Config file",
+    "opencodexSource": "OpenCodex source",
+    "exists": "Exists",
+    "configYaml": "config.yaml",
+    "configExists": "config exists",
+    "codexHome": "CODEX_HOME",
+    "runtimeDir": "Runtime dir",
+    "healthEndpoint": "Health endpoint",
+    "baseUrl": "base_url",
+    "running": "Running"
   },
   "providerKind": {
     "subscription": "Official subscription",
@@ -104,40 +142,47 @@
     "profiles": {
       "title": "Profiles",
       "subtitle": "The working-mode entry point. A profile switches model, provider, network, MCP, and safety policy together.",
+      "sourceTitle": "Config Source",
       "listTitle": "Profiles",
-      "detailTitle": "Profile Detail"
+      "detailTitle": "Profile Detail",
+      "createTitle": "Add Profile",
+      "createHint": "A diff is generated first. The config is backed up and written only after confirmation.",
+      "writePreviewTitle": "Write Preview",
+      "mcpSubsection": "MCP tools referenced by this profile"
     },
     "providers": {
       "title": "Providers",
       "subtitle": "Manage model sources. Subscription, official API, compatible API, and local gateway stay separated to avoid auth conflicts.",
+      "sourceTitle": "Config Source",
+      "writePreviewTitle": "Write Preview",
       "listTitle": "Providers",
       "detailTitle": "Provider Detail",
       "createTitle": "Add Provider",
-      "createHint": "This only updates frontend state and does not write config.toml. Enter an environment variable name, never a raw API key."
+      "createHint": "A diff is generated first. The config is backed up and written only after confirmation. Enter an environment variable name, never a raw API key.",
+      "networkSubsection": "Network route attached to this provider"
     },
     "gateway": {
       "title": "Gateway",
-      "subtitle": "Manage local gateway presets, runtime status, ports, logs, and protocol adapters. OpenCodex, codex-proxy, and CLIProxyAPI plug in here later.",
+      "subtitle": "Manage the local gateway runtime, ports, logs, access password, and protocol adapters. OpenCodex is now wired as the core runtime base; other gateways can be added later.",
+      "openCodexTitle": "OpenCodex Runtime",
+      "lanWarning": "Safety note: Codex Box starts OpenCodex on 127.0.0.1 by default and does not expose it to LAN automatically. The mobile URL is only a candidate address until an access password is configured and LAN mode is used.",
       "presetsTitle": "Gateway Presets",
-      "runtimeTitle": "Runtime"
+      "runtimeTitle": "Runtime",
+      "diffSubsection": "Files Gateway may touch on start"
     },
-    "mcp": {
-      "title": "MCP Servers",
-      "subtitle": "Manage Codex tools. Check command/url, enabled state, and env references without exposing secrets.",
-      "listTitle": "Servers",
-      "detailTitle": "Server Detail"
+    "mobileAccess": {
+      "title": "Mobile Access",
+      "subtitle": "Reach Codex Box middleware from a phone or browser via the local or LAN URL. Configure the access password before enabling LAN.",
+      "qrTitle": "Access QR Code",
+      "qrPlaceholder": "QR code placeholder (M3 wires qrcode.react)",
+      "infoTitle": "Access Info",
+      "lanOffHint": "Mobile access is off. Configure the access password on the Gateway page and start in LAN mode first."
     },
-    "network": {
-      "title": "Network",
-      "subtitle": "Manage Codex Box routes for config and diagnostics only. It does not take over the system proxy.",
-      "routesTitle": "Routes",
-      "testTitle": "Connectivity"
-    },
-    "configDiff": {
-      "title": "Config Diff",
-      "subtitle": "Every write must create a backup, show a diff, then use atomic write. This page demonstrates the flow and does not write config yet.",
-      "flowTitle": "Write Flow",
-      "diffTitle": "Diff Preview"
+    "codexRuntime": {
+      "title": "Codex Runtime",
+      "subtitle": "Show Codex Desktop / OpenCodex runtime paths, config entries, and shared state. Codex Box does not modify Codex Desktop internal files.",
+      "checkoutTitle": "OpenCodex Checkout",
+      "sharedTitle": "Shared & Runtime"
     },
     "diagnostics": {
       "title": "Diagnostics",
@@ -166,6 +211,10 @@
       "title": "Atomic Write",
       "desc": "Write tmp first, then rename"
     }
+  },
+  "diff": {
+    "insertions": "Insertions",
+    "deletions": "Deletions"
   },
   "diagnostics": {
     "groups": {
@@ -223,11 +272,14 @@
   },
   "feedback": {
     "profileCreate": "Profile creation draft opened.",
-    "profileActivated": "{{name}} is marked active in the demo state.",
+    "profileActivated": "{{name}} is now the active Profile.",
+    "profileCreated": "Profile {{name}} was written to config.",
+    "profileFormInvalid": "Profile name, model, and provider are required.",
+    "profileExists": "A Profile with this name already exists.",
     "profileCopied": "Copied the structure for {{name}}.",
     "dangerBlocked": "Dangerous action blocked. Real deletion must go through diff and backup.",
     "providerCreate": "Provider creation draft opened.",
-    "providerCreated": "{{name}} was added to the local list. It has not been written to config.",
+    "providerCreated": "{{name}} was written to config.",
     "providerFormInvalid": "Fill in name, base_url, environment variable, and at least one model.",
     "providerSecretRejected": "Do not paste a raw secret here. Use an environment variable name such as OPENROUTER_API_KEY.",
     "connectionTested": "{{name}} connection test completed (mock).",
@@ -237,6 +289,13 @@
     "gatewayStarted": "{{name}} is running in frontend state.",
     "gatewayStopped": "{{name}} stopped in frontend state.",
     "openLogs": "Log entry is ready; real log reading will be wired later.",
+    "openCodexStarted": "OpenCodex gateway started.",
+    "openCodexLanStarted": "OpenCodex gateway started in LAN mode.",
+    "openCodexStopped": "OpenCodex gateway stopped.",
+    "gatewayStarted": "OpenCodex gateway started (local mode).",
+    "gatewayStartedLan": "OpenCodex gateway started (LAN mode).",
+    "openCodexRestarted": "OpenCodex gateway restarted.",
+    "openCodexUrlOpened": "OpenCodex URL opened.",
     "mcpCreate": "MCP creation draft opened.",
     "mcpToggled": "{{name}} enabled state updated in frontend state.",
     "mcpTested": "{{name}} test completed (mock).",

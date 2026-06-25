@@ -45,8 +45,11 @@ html, body, #root {
 }
 
 body {
-  font-family: 'Inter Variable', 'Inter', 'Noto Sans SC', 'PingFang SC',
-    'Hiragino Sans GB', 'Microsoft YaHei', system-ui, sans-serif;
+  /* v0.6 修订(见 ADR-0003):去掉 Noto Sans SC,中文回退系统字体。
+   * 跨设备一致性回归"系统差异",但 bundle 减重约 3.7MB,首屏不再等 webfont。 */
+  font-family: 'Inter Variable', 'Inter', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei', 'Noto Sans CJK SC', 'WenQuanYi Micro Hei', system-ui,
+    sans-serif;
   color: #1C1C1E;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
