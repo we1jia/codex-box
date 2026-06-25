@@ -1,8 +1,8 @@
 {
   "nav": {
     "dashboard": "总览",
-    "gateway": "网关服务",
-    "mobile_access": "手机访问",
+    "models": "模型目录",
+    "provider_routes": "Provider 路由",
     "codex_runtime": "Codex 运行时",
     "profiles": "工作配置",
     "providers": "模型来源",
@@ -82,7 +82,9 @@
     "startLocal": "本机启动",
     "startLan": "局域网启动",
     "restartLan": "局域网重启",
-    "confirmWrite": "确认写入"
+    "confirmWrite": "确认写入",
+    "hide": "隐藏",
+    "show": "显示"
   },
   "summary": {
     "totalProfiles": "工作配置数",
@@ -90,7 +92,12 @@
     "safeWrites": "安全写入",
     "checks": "检查项",
     "warnings": "警告",
-    "report": "报告"
+    "report": "报告",
+    "totalModels": "模型目录条目",
+    "visibleModels": "可见模型",
+    "totalRoutes": "Provider 路由数",
+    "enabledRoutes": "已启用路由",
+    "disabledRoutes": "已禁用路由"
   },
   "fields": {
     "kind": "类型",
@@ -124,7 +131,24 @@
     "runtimeDir": "运行时目录",
     "healthEndpoint": "健康检查端点",
     "baseUrl": "base_url",
-    "running": "运行状态"
+    "running": "运行状态",
+    "catalogPath": "模型目录路径",
+    "contentHash": "内容哈希",
+    "displayName": "显示名",
+    "visible": "可见性",
+    "reasoning": "推理档位",
+    "providersPath": "Provider 路由文件",
+    "providersCount": "Provider 路由条数",
+    "catalogCount": "模型目录条数",
+    "readAt": "最近读取",
+    "codexCliPath": "Codex CLI 路径",
+    "codexDesktopAppPath": "Codex Desktop 路径",
+    "codexDesktopVersion": "Codex Desktop 版本",
+    "configReadable": "Config 可读",
+    "desktopInstalled": "Desktop 已安装",
+    "cliAvailable": "CLI 可用",
+    "opencodexDir": "~/.opencodex 目录",
+    "note": "备注"
   },
   "providerKind": {
     "subscription": "官方订阅",
@@ -152,7 +176,7 @@
     },
     "providers": {
       "title": "模型来源",
-      "subtitle": "管理模型来源。订阅、官方 API、第三方兼容 API、本地网关分开建模，避免认证混用。",
+      "subtitle": "管理写入 ~/.codex/config.toml 的 provider。订阅、官方 API、第三方兼容 API、本地 gateway 分开建模，避免认证混用。",
       "sourceTitle": "配置来源",
       "writePreviewTitle": "写入预览",
       "listTitle": "来源列表",
@@ -161,36 +185,37 @@
       "createHint": "写入前会先生成 diff；确认后才会备份并写入 config.toml。API key 只能填写环境变量名，不能填写明文密钥。",
       "networkSubsection": "当前 provider 关联的网络路由"
     },
-    "gateway": {
-      "title": "网关服务",
-      "subtitle": "管理本地网关的运行状态、端口、日志、密码和协议适配。OpenCodex 已作为核心运行底座接入，其他网关后续扩展。",
-      "openCodexTitle": "OpenCodex 运行底座",
-      "lanWarning": "安全提示：Codex Box 默认只用 127.0.0.1 启动 OpenCodex，不会自动暴露到局域网。手机访问地址只是候选地址；只有先配置访问密码，再使用局域网启动后才会启用。",
-      "presetsTitle": "网关预设",
-      "runtimeTitle": "运行状态",
-      "diffSubsection": "Gateway 启动可能改动的范围"
+    "models": {
+      "title": "模型目录",
+      "subtitle": "BYOK 模型下拉来源：聚合 ~/.opencodex/custom_model_catalog.json 中所有自定义模型条目，决定 Codex App 模型下拉里能选到哪些模型。",
+      "catalogSourceTitle": "模型目录来源",
+      "listTitle": "模型目录",
+      "detailTitle": "模型详情",
+      "byokHint": "BYOK 切模型说明",
+      "byokHintBody": "切换的不是裸 model 字段，而是整组 CodexProfile。Codex Box 写 ~/.codex/config.toml 走既有 backup → diff → confirm → atomic write 闭环，写 ~/.opencodex/custom_model_catalog.json 走相同的写入闭环。未知字段保留，方便后续与 AITabby/opencodex CLI 共存。"
     },
-    "mobileAccess": {
-      "title": "手机访问",
-      "subtitle": "通过局域网或本机 URL 在手机/浏览器访问 Codex Box 的中间件。先确认安全提示，再启用 LAN。",
-      "qrTitle": "访问二维码",
-      "qrPlaceholder": "二维码占位 (M3 接入 qrcode.react)",
-      "infoTitle": "访问信息",
-      "lanOffHint": "手机访问未启用。请先在 Gateway 页配置访问密码并以局域网模式启动。"
+    "providerRoutes": {
+      "title": "Provider 路由",
+      "subtitle": "管理 ~/.opencodex/providers.json。每个 provider 路由对应 Codex App 模型下拉里一组候选模型。",
+      "sourceTitle": "配置来源",
+      "listTitle": "Provider 路由",
+      "detailTitle": "路由详情"
     },
     "codexRuntime": {
       "title": "Codex 运行时",
-      "subtitle": "展示 Codex Desktop / OpenCodex 的运行路径、配置入口和共享状态。Codex Box 不修改 Codex Desktop 内部文件。",
-      "checkoutTitle": "OpenCodex 检出",
-      "sharedTitle": "共享与运行时"
+      "subtitle": "Codex Desktop / CLI / ~/.opencodex/ 目录的只读检测。Codex Box 不修改 Codex Desktop 内部文件，也不启动任何外部 gateway 进程。",
+      "desktopTitle": "Codex Desktop / CLI",
+      "opencodexTitle": "BYOK 共享目录",
+      "readonlyHint": "只读红线",
+      "readonlyHintBody": "本页面只展示安装路径、文件位置和最近读取时间。Codex Box 不会 patch Codex Desktop 内部文件，也不会起任何 HTTP/WS 端口。Codex App 重读 ~/.codex/config.toml 后，BYOK 模型下拉自动出现新模型。"
     },
     "diagnostics": {
       "title": "诊断检查",
-      "subtitle": "按配置、模型来源、网络、MCP、备份、认证和网关分组，生成可复制的脱敏诊断报告。"
+      "subtitle": "按配置、模型来源、BYOK 目录、网络、MCP、备份分组，生成可复制的脱敏诊断报告。"
     },
     "settings": {
       "title": "设置",
-      "subtitle": "应用级设置：语言、主题、安全策略、备份保留、日志脱敏和实验功能。",
+      "subtitle": "应用级设置：语言、主题、安全策略、备份保留、日志脱敏和 BYOK 行为开关。",
       "sectionsTitle": "设置分类"
     }
   },
@@ -220,7 +245,7 @@
     "groups": {
       "config": "配置",
       "provider": "模型来源 / 认证",
-      "gateway": "网关",
+      "byok": "BYOK 目录",
       "mcp": "MCP",
       "backup": "备份"
     },
@@ -229,8 +254,8 @@
       "profileRefs": "配置引用",
       "providerUrl": "来源 URL",
       "authEnv": "API key 环境变量",
-      "gatewayHealth": "网关健康检查",
-      "port": "端口占用",
+      "providersJson": "providers.json 解析",
+      "catalogJson": "custom_model_catalog.json 解析",
       "mcpCommand": "MCP command",
       "mcpEnv": "MCP env 引用",
       "backupDir": "备份目录",
@@ -243,14 +268,14 @@
       "security": "安全",
       "backup": "备份",
       "logs": "日志",
-      "experiments": "实验功能"
+      "byok": "BYOK 行为"
     },
     "sectionDesc": {
       "general": "语言、主题和启动行为",
       "security": "写入确认和 secret 脱敏",
       "backup": "备份、保留和回滚",
       "logs": "日志大小、脱敏和报告",
-      "experiments": "网关预设和插件入口"
+      "byok": "BYOK 写入开关、schema 保留与可见性同步"
     },
     "options": {
       "language": { "label": "语言", "desc": "跟随当前界面语言，可随时切换。" },
@@ -265,9 +290,9 @@
       "redaction": { "label": "日志脱敏", "desc": "诊断日志只保留 route、状态和耗时等摘要。" },
       "maxSize": { "label": "日志大小限制", "desc": "日志文件达到上限后轮转，避免无限增长。" },
       "exportReport": { "label": "导出诊断报告", "desc": "报告默认脱敏，可复制给自己排查。" },
-      "gatewayPresets": { "label": "网关预设", "desc": "启用 OpenCodex、codex-proxy、CLIProxyAPI 的预设入口。" },
-      "pluginDirs": { "label": "外部插件目录", "desc": "默认关闭，后续只允许显式信任的目录。" },
-      "desktopScan": { "label": "Codex Desktop 检测", "desc": "只读检测安装路径，不修改内部文件。" }
+      "byokWriteEnabled": { "label": "BYOK 写入总开关", "desc": "关闭后 Models / Provider Routes 页只读，不能写入 ~/.opencodex/。" },
+      "byokSchemaPreserve": { "label": "BYOK schema 兼容", "desc": "读写 ~/.opencodex/*.json 时保留未知字段，便于与 AITabby CLI 共存。" },
+      "byokVisibilitySync": { "label": "可见性同步", "desc": "在 Models 页切换 visible 时，同步更新 custom_model_catalog.json。" }
     }
   },
   "feedback": {
@@ -285,17 +310,14 @@
     "connectionTested": "{{name}} 连接测试已完成（模拟）。",
     "providerCopied": "已复制 {{name}} 的模型来源配置。",
     "previewDiff": "已生成配置变更预览。",
+    "modelVisibilityToggled": "{{name}} 可见性已更新。",
+    "providerRouteToggled": "Provider 路由 {{name}} 已切换启用状态。",
+    "providerRouteDeleted": "Provider 路由 {{name}} 已删除。",
+    "opencodexParseErrors": "BYOK 目录文件解析失败，写入已拦截：",
     "gatewayPreset": "已打开网关预设导入流程。",
     "gatewayStarted": "{{name}} 已进入运行中状态（前端模拟）。",
     "gatewayStopped": "{{name}} 已停止（前端模拟）。",
     "openLogs": "日志入口已就绪，后续会接入真实日志读取。",
-    "openCodexStarted": "OpenCodex gateway 已启动。",
-    "gatewayStarted": "OpenCodex gateway 已启动（本机模式）。",
-    "gatewayStartedLan": "OpenCodex gateway 已启动（局域网模式）。",
-    "openCodexLanStarted": "OpenCodex gateway 已按局域网模式启动。",
-    "openCodexStopped": "OpenCodex gateway 已停止。",
-    "openCodexRestarted": "OpenCodex gateway 已重启。",
-    "openCodexUrlOpened": "已打开 OpenCodex 访问地址。",
     "mcpCreate": "已打开 MCP 创建流程草稿。",
     "mcpToggled": "{{name}} 的启用状态已更新（前端模拟）。",
     "mcpTested": "{{name}} 测试完成（模拟）。",

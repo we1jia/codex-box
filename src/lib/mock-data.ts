@@ -1,10 +1,12 @@
 import type {
+  CodexRuntimeStatus,
   DiagnosticGroupView,
   DiffLineView,
-  GatewayPresetView,
   McpServerView,
+  ModelCatalogEntry,
   NetworkRouteView,
   ProfileView,
+  ProviderRoute,
   ProviderView,
   SettingsSectionView,
 } from "@/lib/types";
@@ -100,41 +102,103 @@ export const mockProviders: ProviderView[] = [
   },
 ];
 
-export const mockGateways: GatewayPresetView[] = [
+// BYOK · ~/.opencodex/providers.json 内容 mock
+export const mockProviderRoutes: ProviderRoute[] = [
   {
-    id: "local-gateway",
-    name: "Local Gateway",
-    kind: "local",
-    host: "127.0.0.1",
-    port: 8080,
-    status: "idle",
-    logPath: "~/.codex/codex-box/logs/gateway.log",
-    healthPath: "/api/health",
-    adapter: "openai-compatible-chat",
+    name: "openrouter",
+    baseUrl: "https://openrouter.ai/api/v1",
+    wireApi: "chat",
+    apiKeyRef: "OPENROUTER_API_KEY",
+    httpHeaders: {},
+    enabled: true,
+    note: "OpenAI-compatible · 多家模型路由",
   },
   {
-    id: "opencodex",
-    name: "OpenCodex",
-    kind: "opencodex",
-    host: "127.0.0.1",
-    port: 3737,
-    status: "warn",
-    logPath: "~/Library/Application Support/OpenCodex/logs/gateway.log",
-    healthPath: "/api/health",
-    adapter: "desktop-web-middleware",
+    name: "deepseek",
+    baseUrl: "https://api.deepseek.com/v1",
+    wireApi: "chat",
+    apiKeyRef: "DEEPSEEK_API_KEY",
+    httpHeaders: {},
+    enabled: true,
+    note: "国产 / 高性价比",
   },
   {
-    id: "cli-proxy-api",
-    name: "CLIProxyAPI",
-    kind: "cli_proxy_api",
-    host: "127.0.0.1",
-    port: 4141,
-    status: "idle",
-    logPath: "~/.codex/codex-box/logs/cliproxyapi.log",
-    healthPath: "/health",
-    adapter: "responses-to-chat",
+    name: "zhipu",
+    baseUrl: "https://open.bigmodel.cn/api/paas/v4",
+    wireApi: "chat",
+    apiKeyRef: "ZHIPU_API_KEY",
+    httpHeaders: {},
+    enabled: true,
+    note: "GLM-4 系列",
+  },
+  {
+    name: "local-gateway",
+    baseUrl: "http://127.0.0.1:8080/v1",
+    wireApi: "chat",
+    apiKeyRef: "CODEX_BOX_GATEWAY_KEY",
+    httpHeaders: {},
+    enabled: false,
+    note: "本机 endpoint · 启用前请确认访问控制",
   },
 ];
+
+// BYOK · ~/.opencodex/custom_model_catalog.json 内容 mock
+export const mockModelCatalog: ModelCatalogEntry[] = [
+  {
+    modelId: "gpt-5-codex",
+    displayName: "GPT-5 Codex (官方)",
+    provider: "codex-subscription",
+    visible: true,
+    reasoning: null,
+    note: "Codex App 官方订阅默认",
+  },
+  {
+    modelId: "gpt-5.1",
+    displayName: "GPT-5.1 (OpenAI API)",
+    provider: "openai-official-api",
+    visible: true,
+    reasoning: { enabled: true, levels: ["low", "medium", "high"] },
+    note: "官方 API · 通过 OPENAI_API_KEY",
+  },
+  {
+    modelId: "openai/gpt-5-mini",
+    displayName: "GPT-5 mini (via OpenRouter)",
+    provider: "openrouter",
+    visible: true,
+    reasoning: { enabled: true, levels: ["low", "medium", "high"] },
+    note: "OpenRouter 路由 · 第三方 OpenAI-compatible",
+  },
+  {
+    modelId: "deepseek-chat",
+    displayName: "DeepSeek Chat",
+    provider: "deepseek",
+    visible: true,
+    reasoning: null,
+    note: "国产 / 高性价比",
+  },
+  {
+    modelId: "glm-4",
+    displayName: "GLM-4 (智谱)",
+    provider: "zhipu",
+    visible: true,
+    reasoning: null,
+    note: "国产 / OpenAI-compatible",
+  },
+];
+
+// Codex Runtime 检测(只读)
+export const mockCodexRuntime: CodexRuntimeStatus = {
+  codexHome: "~/.codex",
+  codexCliPath: "/usr/local/bin/codex",
+  codexDesktopAppPath: "/Applications/Codex.app",
+  codexDesktopVersion: "0.0.1 (local mock)",
+  desktopInstalled: true,
+  cliAvailable: true,
+  configReadable: true,
+  authStateDetected: true,
+  opencodexDir: "~/.opencodex",
+  opencodexDirExists: false,
+};
 
 export const mockMcpServers: McpServerView[] = [
   {
@@ -209,11 +273,11 @@ export const mockDiagnostics: DiagnosticGroupView[] = [
     ],
   },
   {
-    id: "gateway",
-    titleKey: "diagnostics.groups.gateway",
+    id: "byok",
+    titleKey: "diagnostics.groups.byok",
     items: [
-      { id: "gatewayHealth", labelKey: "diagnostics.items.gatewayHealth", detail: "127.0.0.1:8080/api/health", status: "idle" },
-      { id: "port", labelKey: "diagnostics.items.port", detail: "8080", status: "idle" },
+      { id: "providersJson", labelKey: "diagnostics.items.providersJson", detail: "~/.opencodex/providers.json", status: "ok" },
+      { id: "catalogJson", labelKey: "diagnostics.items.catalogJson", detail: "~/.opencodex/custom_model_catalog.json", status: "ok" },
     ],
   },
   {
@@ -256,8 +320,8 @@ export const mockSettingsSections: SettingsSectionView[] = [
     optionKeys: ["redaction", "maxSize", "exportReport"],
   },
   {
-    id: "experiments",
-    titleKey: "settings.sections.experiments",
-    optionKeys: ["gatewayPresets", "pluginDirs", "desktopScan"],
+    id: "byok",
+    titleKey: "settings.sections.byok",
+    optionKeys: ["byokWriteEnabled", "byokSchemaPreserve", "byokVisibilitySync"],
   },
 ];

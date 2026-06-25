@@ -12,10 +12,15 @@ export const SIDEBAR_WIDTH_DEFAULT = 260;
 export const clampSidebarWidth = (w: number) =>
   Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, Math.round(w)));
 
+/**
+ * 页面 ID。v0.3 顺序与 ⌘1-7 快捷键一一对应:
+ *   1 dashboard · 2 models · 3 provider_routes · 4 codex_runtime
+ *   5 profiles · 6 providers · 7 diagnostics · , settings
+ */
 export type PageId =
   | "dashboard"
-  | "gateway"
-  | "mobile_access"
+  | "models"
+  | "provider_routes"
   | "codex_runtime"
   | "profiles"
   | "providers"
@@ -24,8 +29,8 @@ export type PageId =
 
 export const PAGE_IDS: PageId[] = [
   "dashboard",
-  "gateway",
-  "mobile_access",
+  "models",
+  "provider_routes",
   "codex_runtime",
   "profiles",
   "providers",
@@ -69,7 +74,7 @@ export const useUIStore = create<UIState>()(
         sidebarCollapsed: s.sidebarCollapsed,
         sidebarWidth: s.sidebarWidth,
       }),
-      // 防止历史数据中残留的非法宽度把 store 弄坏
+      // 防止历史数据中残留的非法宽度或 page id 把 store 弄坏
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         if (!PAGE_IDS.includes(state.activePage)) {

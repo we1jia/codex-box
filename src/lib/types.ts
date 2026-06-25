@@ -105,44 +105,83 @@ export interface ProviderView {
   models: string[];
 }
 
-export interface GatewayPresetView {
-  id: string;
+// BYOK · ProviderRoute · ~/.opencodex/providers.json 条目
+export interface ProviderRoute {
   name: string;
-  kind: "local" | "opencodex" | "codex_proxy" | "cli_proxy_api";
-  host: string;
-  port: number;
-  status: StatusTone;
-  logPath: string;
-  healthPath: string;
-  adapter: string;
+  baseUrl: string;
+  wireApi: string;
+  apiKeyRef: string | null;
+  httpHeaders: Record<string, string>;
+  enabled: boolean;
+  note: string | null;
 }
 
-export interface OpenCodexStatus {
-  sourcePath: string;
-  exists: boolean;
-  packageJsonPath: string;
-  configYamlPath: string;
-  configExists: boolean;
-  authPasswordConfigured: boolean;
-  running: boolean;
-  managed: boolean;
-  pid: number | null;
-  host: string;
-  port: number;
-  localUrl: string;
-  lanUrls: string[];
-  mobileUrl: string | null;
-  lanAccessEnabled: boolean;
-  mobileUrlReachable: boolean;
+// BYOK · ModelCatalogEntry · ~/.opencodex/custom_model_catalog.json 条目
+export interface ModelCatalogEntry {
+  modelId: string;
+  displayName: string | null;
+  provider: string;
+  visible: boolean;
+  reasoning: ReasoningConfig | null;
+  note: string | null;
+}
+
+export interface ReasoningConfig {
+  enabled: boolean;
+  levels: string[];
+}
+
+// BYOK · ~/.opencodex/ 完整快照
+export interface OpenCodexCustomConfig {
+  schemaVersion: number;
+  providersPath: string;
+  catalogPath: string;
+  providers: ProviderRoute[];
+  catalog: ModelCatalogEntry[];
+  rawProvidersText: string;
+  rawCatalogText: string;
+  providersContentHash: string;
+  catalogContentHash: string;
+  readAt: string;
+  valid: boolean;
+  parseErrors: OpenCodexParseError[];
+}
+
+export interface OpenCodexParseError {
+  file: string;
+  message: string;
+}
+
+export interface OpenCodexWriteRequest<T> {
+  entry: T;
+  expectedHash: string;
+  note: string | null;
+}
+
+export interface OpenCodexDeleteRequest {
+  key: string;
+  expectedHash: string;
+  note: string | null;
+}
+
+export interface OpenCodexWriteResult {
+  filePath: string;
+  backupId: string;
+  newHash: string;
+}
+
+// Codex Runtime 检测(只读)
+export interface CodexRuntimeStatus {
   codexHome: string;
-  sharedCodexHome: string;
-  runtimeDir: string;
-  logPath: string;
-  healthEndpoint: string;
-  healthOk: boolean;
-  healthStatus: number | null;
-  lastError: string | null;
-  lanRequiresPassword: boolean;
+  codexCliPath: string | null;
+  codexDesktopAppPath: string | null;
+  codexDesktopVersion: string | null;
+  desktopInstalled: boolean;
+  cliAvailable: boolean;
+  configReadable: boolean;
+  authStateDetected: boolean;
+  opencodexDir: string;
+  opencodexDirExists: boolean;
 }
 
 export interface McpServerView {

@@ -4,8 +4,8 @@ import {
   Plus,
   LayoutDashboard,
   Server,
-  Cable,
-  Smartphone,
+  Sparkles,
+  Route,
   Cpu,
   Users,
   Activity,
@@ -23,8 +23,8 @@ import { startWindowDragFromMouseEvent } from "@/lib/window-drag";
 
 const NAV_ITEMS = [
   { id: "dashboard", Icon: LayoutDashboard, key: "1" },
-  { id: "gateway", Icon: Cable, key: "2" },
-  { id: "mobile_access", Icon: Smartphone, key: "3" },
+  { id: "models", Icon: Sparkles, key: "2" },
+  { id: "provider_routes", Icon: Route, key: "3" },
   { id: "codex_runtime", Icon: Cpu, key: "4" },
   { id: "profiles", Icon: Users, key: "5" },
   { id: "providers", Icon: Server, key: "6" },

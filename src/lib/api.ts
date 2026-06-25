@@ -1,10 +1,16 @@
 import { invoke } from "@tauri-apps/api/core";
-import { mockProfiles, mockProviders } from "@/lib/mock-data";
+import { mockCodexRuntime, mockModelCatalog, mockProfiles, mockProviderRoutes, mockProviders } from "@/lib/mock-data";
 import type {
   ConfigChangePreviewView,
   ConfigSnapshotView,
   DashboardSummary,
-  OpenCodexStatus,
+  ModelCatalogEntry,
+  OpenCodexCustomConfig,
+  OpenCodexDeleteRequest,
+  OpenCodexWriteRequest,
+  OpenCodexWriteResult,
+  ProviderRoute,
+  CodexRuntimeStatus,
 } from "@/lib/types";
 
 export type ApiResult<T> =
@@ -16,7 +22,7 @@ export async function invokeCmd<T>(
   args?: Record<string, unknown>
 ): Promise<ApiResult<T>> {
   if (!("__TAURI_INTERNALS__" in window)) {
-    const fallback = browserFallback<T>(name);
+    const fallback = browserFallback<T>(name, args);
     if (fallback) return fallback;
   }
 
@@ -28,38 +34,10 @@ export async function invokeCmd<T>(
   }
 }
 
-function browserFallback<T>(name: string): ApiResult<T> | null {
-  if (name.startsWith("opencodex_")) {
-    const data: OpenCodexStatus = {
-      sourcePath: "/Users/liuweijia/Desktop/AI/OpenCodex",
-      exists: true,
-      packageJsonPath: "/Users/liuweijia/Desktop/AI/OpenCodex/package.json",
-      configYamlPath: "/Users/liuweijia/Desktop/AI/OpenCodex/config.yaml",
-      configExists: false,
-      authPasswordConfigured: false,
-      running: false,
-      managed: false,
-      pid: null,
-      host: "127.0.0.1",
-      port: 3737,
-      localUrl: "http://127.0.0.1:3737",
-      lanUrls: ["http://192.168.1.10:3737"],
-      mobileUrl: "http://192.168.1.10:3737",
-      lanAccessEnabled: false,
-      mobileUrlReachable: false,
-      codexHome: "~/.codex",
-      sharedCodexHome: "~/.codex",
-      runtimeDir: "~/.codex/codex-box/opencodex/runtime",
-      logPath: "~/.codex/codex-box/logs/opencodex-gateway.log",
-      healthEndpoint: "http://127.0.0.1:3737/api/health",
-      healthOk: false,
-      healthStatus: null,
-      lastError: null,
-      lanRequiresPassword: true,
-    };
-    return { ok: true, data: data as T };
-  }
-
+function browserFallback<T>(
+  name: string,
+  args?: Record<string, unknown>
+): ApiResult<T> | null {
   if (name === "config_snapshot") {
     const data: ConfigSnapshotView = {
       configPath: "~/.codex/config.toml",
@@ -89,6 +67,47 @@ function browserFallback<T>(name: string): ApiResult<T> | null {
 
   if (name === "config_change_apply") {
     return { ok: false, error: "浏览器预览模式不能写入 ~/.codex/config.toml，请在 Tauri 应用中确认写入。" };
+  }
+
+  if (name === "opencodex_config_read") {
+    const data: OpenCodexCustomConfig = {
+      schemaVersion: 1,
+      providersPath: "~/.opencodex/providers.json",
+      catalogPath: "~/.opencodex/custom_model_catalog.json",
+      providers: mockProviderRoutes,
+      catalog: mockModelCatalog,
+      rawProvidersText: "[]",
+      rawCatalogText: "[]",
+      providersContentHash: "browser-providers-hash",
+      catalogContentHash: "browser-catalog-hash",
+      readAt: new Date().toISOString(),
+      valid: true,
+      parseErrors: [],
+    };
+    return { ok: true, data: data as T };
+  }
+
+  if (name === "provider_route_upsert" || name === "catalog_entry_upsert") {
+    const data: OpenCodexWriteResult = {
+      filePath: name === "provider_route_upsert" ? "~/.opencodex/providers.json" : "~/.opencodex/custom_model_catalog.json",
+      backupId: "browser-backup-id",
+      newHash: "browser-new-hash",
+    };
+    return { ok: true, data: data as T };
+  }
+
+  if (name === "provider_route_delete" || name === "catalog_entry_delete") {
+    const data: OpenCodexWriteResult = {
+      filePath: name === "provider_route_delete" ? "~/.opencodex/providers.json" : "~/.opencodex/custom_model_catalog.json",
+      backupId: "browser-backup-id",
+      newHash: "browser-new-hash",
+    };
+    return { ok: true, data: data as T };
+  }
+
+  if (name === "codex_runtime_status") {
+    const data: CodexRuntimeStatus = mockCodexRuntime;
+    return { ok: true, data: data as T };
   }
 
   if (name !== "dashboard_summary") return null;

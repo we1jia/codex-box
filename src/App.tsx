@@ -9,9 +9,9 @@ import { setLanguage } from "@/lib/i18n";
 import {
   CodexRuntimePage,
   DiagnosticsPage,
-  GatewayPage,
-  MobileAccessPage,
+  ModelsPage,
   ProfilesPage,
+  ProviderRoutesPage,
   ProvidersPage,
   SettingsPage,
 } from "@/pages/WorkspacePages";
@@ -34,10 +34,10 @@ function ActivePage() {
   const activePage = useUIStore((s) => s.activePage);
 
   switch (activePage) {
-    case "gateway":
-      return <GatewayPage />;
-    case "mobile_access":
-      return <MobileAccessPage />;
+    case "models":
+      return <ModelsPage />;
+    case "provider_routes":
+      return <ProviderRoutesPage />;
     case "codex_runtime":
       return <CodexRuntimePage />;
     case "profiles":

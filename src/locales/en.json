@@ -1,8 +1,8 @@
 {
   "nav": {
     "dashboard": "Overview",
-    "gateway": "Gateway",
-    "mobile_access": "Mobile Access",
+    "models": "Models",
+    "provider_routes": "Provider Routes",
     "codex_runtime": "Codex Runtime",
     "profiles": "Profiles",
     "providers": "Providers",
@@ -82,7 +82,9 @@
     "startLocal": "Start Local",
     "startLan": "Start LAN",
     "restartLan": "Restart LAN",
-    "confirmWrite": "Confirm Write"
+    "confirmWrite": "Confirm Write",
+    "hide": "Hide",
+    "show": "Show"
   },
   "summary": {
     "totalProfiles": "Profiles",
@@ -90,7 +92,12 @@
     "safeWrites": "Safe Writes",
     "checks": "Checks",
     "warnings": "Warnings",
-    "report": "Report"
+    "report": "Report",
+    "totalModels": "Catalog entries",
+    "visibleModels": "Visible models",
+    "totalRoutes": "Provider routes",
+    "enabledRoutes": "Enabled routes",
+    "disabledRoutes": "Disabled routes"
   },
   "fields": {
     "kind": "Kind",
@@ -124,7 +131,24 @@
     "runtimeDir": "Runtime dir",
     "healthEndpoint": "Health endpoint",
     "baseUrl": "base_url",
-    "running": "Running"
+    "running": "Running",
+    "catalogPath": "Catalog path",
+    "contentHash": "Content hash",
+    "displayName": "Display name",
+    "visible": "Visible",
+    "reasoning": "Reasoning",
+    "providersPath": "Providers file",
+    "providersCount": "Providers count",
+    "catalogCount": "Catalog count",
+    "readAt": "Last read",
+    "codexCliPath": "Codex CLI path",
+    "codexDesktopAppPath": "Codex Desktop path",
+    "codexDesktopVersion": "Codex Desktop version",
+    "configReadable": "Config readable",
+    "desktopInstalled": "Desktop installed",
+    "cliAvailable": "CLI available",
+    "opencodexDir": "~/.opencodex dir",
+    "note": "Note"
   },
   "providerKind": {
     "subscription": "Official subscription",
@@ -152,7 +176,7 @@
     },
     "providers": {
       "title": "Providers",
-      "subtitle": "Manage model sources. Subscription, official API, compatible API, and local gateway stay separated to avoid auth conflicts.",
+      "subtitle": "Manage model providers written into ~/.codex/config.toml. Subscription, official API, compatible API, and local gateway stay separated to avoid auth conflicts.",
       "sourceTitle": "Config Source",
       "writePreviewTitle": "Write Preview",
       "listTitle": "Providers",
@@ -161,36 +185,37 @@
       "createHint": "A diff is generated first. The config is backed up and written only after confirmation. Enter an environment variable name, never a raw API key.",
       "networkSubsection": "Network route attached to this provider"
     },
-    "gateway": {
-      "title": "Gateway",
-      "subtitle": "Manage the local gateway runtime, ports, logs, access password, and protocol adapters. OpenCodex is now wired as the core runtime base; other gateways can be added later.",
-      "openCodexTitle": "OpenCodex Runtime",
-      "lanWarning": "Safety note: Codex Box starts OpenCodex on 127.0.0.1 by default and does not expose it to LAN automatically. The mobile URL is only a candidate address until an access password is configured and LAN mode is used.",
-      "presetsTitle": "Gateway Presets",
-      "runtimeTitle": "Runtime",
-      "diffSubsection": "Files Gateway may touch on start"
+    "models": {
+      "title": "Models",
+      "subtitle": "BYOK catalog: aggregates all entries from ~/.opencodex/custom_model_catalog.json and decides which models show up in the Codex App picker.",
+      "catalogSourceTitle": "Catalog Source",
+      "listTitle": "Model Catalog",
+      "detailTitle": "Model Detail",
+      "byokHint": "About switching models",
+      "byokHintBody": "Switching is a whole CodexProfile, not a bare model field. Codex Box writes ~/.codex/config.toml through the existing backup → diff → confirm → atomic write loop, and writes ~/.opencodex/custom_model_catalog.json through the same loop. Unknown fields are preserved to stay compatible with the AITabby/opencodex CLI."
     },
-    "mobileAccess": {
-      "title": "Mobile Access",
-      "subtitle": "Reach Codex Box middleware from a phone or browser via the local or LAN URL. Configure the access password before enabling LAN.",
-      "qrTitle": "Access QR Code",
-      "qrPlaceholder": "QR code placeholder (M3 wires qrcode.react)",
-      "infoTitle": "Access Info",
-      "lanOffHint": "Mobile access is off. Configure the access password on the Gateway page and start in LAN mode first."
+    "providerRoutes": {
+      "title": "Provider Routes",
+      "subtitle": "Manage ~/.opencodex/providers.json. Each route feeds a group of model candidates into the Codex App picker.",
+      "sourceTitle": "Config Source",
+      "listTitle": "Provider Routes",
+      "detailTitle": "Route Detail"
     },
     "codexRuntime": {
       "title": "Codex Runtime",
-      "subtitle": "Show Codex Desktop / OpenCodex runtime paths, config entries, and shared state. Codex Box does not modify Codex Desktop internal files.",
-      "checkoutTitle": "OpenCodex Checkout",
-      "sharedTitle": "Shared & Runtime"
+      "subtitle": "Read-only detection of Codex Desktop, Codex CLI, and ~/.opencodex/. Codex Box does not modify Codex Desktop internals and does not start any external gateway process.",
+      "desktopTitle": "Codex Desktop / CLI",
+      "opencodexTitle": "BYOK Shared Dir",
+      "readonlyHint": "Read-only contract",
+      "readonlyHintBody": "This page only shows install paths, file locations, and last-read times. Codex Box does not patch Codex Desktop internals and does not open any HTTP/WS port. After Codex App re-reads ~/.codex/config.toml, the new models appear in the picker automatically."
     },
     "diagnostics": {
       "title": "Diagnostics",
-      "subtitle": "Grouped checks for config, provider, network, MCP, backup, auth, and gateway with a redacted report."
+      "subtitle": "Grouped checks for config, provider, BYOK dir, network, MCP, and backup with a redacted report."
     },
     "settings": {
       "title": "Settings",
-      "subtitle": "App-level settings for language, theme, safety policy, backup retention, log redaction, and experiments.",
+      "subtitle": "App-level settings for language, theme, safety policy, backup retention, log redaction, and BYOK behavior.",
       "sectionsTitle": "Sections"
     }
   },
@@ -220,7 +245,7 @@
     "groups": {
       "config": "Config",
       "provider": "Provider / Auth",
-      "gateway": "Gateway",
+      "byok": "BYOK Dir",
       "mcp": "MCP",
       "backup": "Backup"
     },
@@ -229,8 +254,8 @@
       "profileRefs": "Profile refs",
       "providerUrl": "Provider URL",
       "authEnv": "API key env",
-      "gatewayHealth": "Gateway health",
-      "port": "Port usage",
+      "providersJson": "providers.json parse",
+      "catalogJson": "custom_model_catalog.json parse",
       "mcpCommand": "MCP command",
       "mcpEnv": "MCP env refs",
       "backupDir": "Backup directory",
@@ -243,14 +268,14 @@
       "security": "Security",
       "backup": "Backup",
       "logs": "Logs",
-      "experiments": "Experiments"
+      "byok": "BYOK Behavior"
     },
     "sectionDesc": {
       "general": "Language, theme, and startup behavior",
       "security": "Write confirmation and secret masking",
       "backup": "Backups, retention, and rollback",
       "logs": "Log size, redaction, and reports",
-      "experiments": "Gateway presets and plugin entry points"
+      "byok": "BYOK write master switch, schema preservation, and visibility sync"
     },
     "options": {
       "language": { "label": "Language", "desc": "Follow the current interface language and switch anytime." },
@@ -265,9 +290,9 @@
       "redaction": { "label": "Log redaction", "desc": "Diagnostics keep route, status, and latency summaries only." },
       "maxSize": { "label": "Log size limit", "desc": "Rotate logs when they reach the configured limit." },
       "exportReport": { "label": "Export diagnostic report", "desc": "Reports are redacted by default and safe to copy." },
-      "gatewayPresets": { "label": "Gateway presets", "desc": "Enable OpenCodex, codex-proxy, and CLIProxyAPI preset entry points." },
-      "pluginDirs": { "label": "External plugin directories", "desc": "Disabled by default. Only explicitly trusted directories are allowed." },
-      "desktopScan": { "label": "Codex Desktop detection", "desc": "Read-only install detection without modifying internal files." }
+      "byokWriteEnabled": { "label": "BYOK write master switch", "desc": "When off, Models and Provider Routes pages are read-only and no writes hit ~/.opencodex/." },
+      "byokSchemaPreserve": { "label": "BYOK schema preservation", "desc": "Preserve unknown fields when reading/writing ~/.opencodex/*.json, so AITabby CLI stays compatible." },
+      "byokVisibilitySync": { "label": "Visibility sync", "desc": "When toggling visibility on the Models page, sync the change into custom_model_catalog.json." }
     }
   },
   "feedback": {
@@ -285,17 +310,14 @@
     "connectionTested": "{{name}} connection test completed (mock).",
     "providerCopied": "Copied provider config for {{name}}.",
     "previewDiff": "Config Diff preview is ready.",
+    "modelVisibilityToggled": "Visibility updated for {{name}}.",
+    "providerRouteToggled": "Provider route {{name}} enable state switched.",
+    "providerRouteDeleted": "Provider route {{name}} deleted.",
+    "opencodexParseErrors": "BYOK directory files failed to parse; writes are blocked:",
     "gatewayPreset": "Gateway preset import flow opened.",
     "gatewayStarted": "{{name}} is running in frontend state.",
     "gatewayStopped": "{{name}} stopped in frontend state.",
     "openLogs": "Log entry is ready; real log reading will be wired later.",
-    "openCodexStarted": "OpenCodex gateway started.",
-    "openCodexLanStarted": "OpenCodex gateway started in LAN mode.",
-    "openCodexStopped": "OpenCodex gateway stopped.",
-    "gatewayStarted": "OpenCodex gateway started (local mode).",
-    "gatewayStartedLan": "OpenCodex gateway started (LAN mode).",
-    "openCodexRestarted": "OpenCodex gateway restarted.",
-    "openCodexUrlOpened": "OpenCodex URL opened.",
     "mcpCreate": "MCP creation draft opened.",
     "mcpToggled": "{{name}} enabled state updated in frontend state.",
     "mcpTested": "{{name}} test completed (mock).",

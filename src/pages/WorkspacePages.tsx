@@ -1,29 +1,27 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Activity,
   AlertTriangle,
-  Cable,
   CheckCircle2,
   ChevronRight,
   Copy,
   Cpu,
+  Eye,
+  EyeOff,
   GitCompare,
-  Globe,
   KeyRound,
   Languages,
   Network,
-  Play,
   Plus,
-  Power,
   Puzzle,
   RotateCcw,
+  Route,
   Save,
   Server,
   Settings,
   ShieldCheck,
-  Smartphone,
-  Square,
+  Sparkles,
   TestTube2,
   Trash2,
   Users,
@@ -31,22 +29,29 @@ import {
 import { invokeCmd } from "@/lib/api";
 import { setLanguage } from "@/lib/i18n";
 import {
+  mockCodexRuntime,
   mockDiagnostics,
-  mockDiffLines,
-  mockGateways,
+  mockModelCatalog,
   mockProfiles,
+  mockProviderRoutes,
   mockProviders,
   mockSettingsSections,
 } from "@/lib/mock-data";
 import type {
   ApplyConfigChangeResultView,
+  CodexRuntimeStatus,
   ConfigChangePreviewView,
   ConfigChangeRequest,
   ConfigSnapshotView,
   DiagnosticGroupView,
   DiffLineView,
-  OpenCodexStatus,
+  ModelCatalogEntry,
+  OpenCodexCustomConfig,
+  OpenCodexDeleteRequest,
+  OpenCodexWriteRequest,
+  OpenCodexWriteResult,
   ProfileView,
+  ProviderRoute,
   ProviderView,
   StatusTone,
 } from "@/lib/types";
@@ -580,6 +585,24 @@ function ProfileCreatePanel({
   );
 }
 
+function DiffLine({ line }: { line: DiffLineView }) {
+  const prefix = line.kind === "insert" ? "+" : line.kind === "delete" ? "-" : line.kind === "change" ? "~" : " ";
+  const cls =
+    line.kind === "insert"
+      ? "text-[#9BE7B1]"
+      : line.kind === "delete"
+        ? "text-[#FF9A9A]"
+        : line.kind === "change"
+          ? "text-[#FFD18A]"
+          : "text-white/60";
+  return (
+    <div className={`min-h-[20px] whitespace-pre-wrap break-all ${cls}`}>
+      <span className="mr-2 select-none text-white/30">{prefix}</span>
+      {line.content}
+    </div>
+  );
+}
+
 export function ProfilesPage() {
   const { t } = useTranslation();
   const { notice, show } = useNotice();
@@ -833,7 +856,6 @@ export function ProfilesPage() {
           </div>
         </Panel>
       </div>
-      {/* MCP 子区块:展示当前 profile 引用的 MCP server 列表,只读 */}
       {selected?.mcpRefs?.length ? (
         <div className="cb-surface p-4">
           <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-ink-700">
@@ -1071,7 +1093,6 @@ export function ProvidersPage() {
           </div>
         </Panel>
       </div>
-      {/* Network 子区块:展示 provider 自身的网络特征,只读 */}
       {selected ? (
         <div className="cb-surface p-4">
           <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-ink-700">
@@ -1094,423 +1115,389 @@ export function ProvidersPage() {
   );
 }
 
-export function GatewayPage() {
+/**
+ * Models 页面:BYOK 模型下拉预览
+ * - 聚合 mockModelCatalog 全部条目
+ * - 列出"已激活 profile"对应的模型
+ * - 提供 toggle visibility(可见性)和 reasoning 配置入口
+ * - 写入走 ~/.opencodex/custom_model_catalog.json
+ */
+export function ModelsPage() {
   const { t } = useTranslation();
   const { notice, show } = useNotice();
-  const [openCodex, setOpenCodex] = useState<OpenCodexStatus | null>(null);
-  const [openCodexBusy, setOpenCodexBusy] = useState(false);
-  const [selectedId, setSelectedId] = useState(mockGateways[0].id);
-  const [running, setRunning] = useState<Record<string, boolean>>({});
-  const selected = mockGateways.find((item) => item.id === selectedId) || mockGateways[0];
-  const isRunning = !!running[selected.id];
-  const status: StatusTone = isRunning ? "running" : selected.status;
-  const openCodexTone: StatusTone = !openCodex?.exists
-    ? "fail"
-    : openCodex.running
-      ? "running"
-      : "idle";
-
-  const refreshOpenCodex = async () => {
-    const result = await invokeCmd<OpenCodexStatus>("opencodex_status");
-    if (result.ok) {
-      setOpenCodex(result.data);
-    } else {
-      show("warning", result.error);
-    }
-  };
-
-  const runOpenCodexAction = async (
-    command:
-      | "opencodex_start"
-      | "opencodex_start_lan"
-      | "opencodex_stop"
-      | "opencodex_restart"
-      | "opencodex_restart_lan"
-      | "opencodex_open_logs",
-    successKey: string
-  ) => {
-    setOpenCodexBusy(true);
-    const result = await invokeCmd<OpenCodexStatus>(command);
-    setOpenCodexBusy(false);
-    if (result.ok) {
-      setOpenCodex(result.data);
-      show("success", t(successKey));
-    } else {
-      show("warning", result.error);
-      void refreshOpenCodex();
-    }
-  };
-
-  const openOpenCodexUrl = async (kind: "local" | "mobile") => {
-    const result = await invokeCmd<OpenCodexStatus>("opencodex_open_url", { kind });
-    if (result.ok) {
-      setOpenCodex(result.data);
-      show("info", t("feedback.openCodexUrlOpened"));
-    } else {
-      show("warning", result.error);
-    }
-  };
-
-  useEffect(() => {
-    void refreshOpenCodex();
-  }, []);
-
-  return (
-    <PageShell
-      title={t("pages.gateway.title")}
-      subtitle={t("pages.gateway.subtitle")}
-      notice={notice}
-      action={<ToolbarButton icon={<Plus size={13} />} variant="primary" onClick={() => show("info", t("feedback.gatewayPreset"))}>{t("actions.importPreset")}</ToolbarButton>}
-    >
-      <Panel
-        title={t("pages.gateway.openCodexTitle")}
-        icon={<Cable size={15} />}
-        action={<StatusPill tone={openCodexTone} />}
-      >
-        <SummaryStrip
-          items={[
-            {
-              label: t("fields.source"),
-              value: openCodex?.exists ? t("common.detected") : t("common.notFound"),
-              tone: openCodex?.exists ? "ok" : "fail",
-            },
-            {
-              label: t("fields.status"),
-              value: openCodex?.running ? t("status.running") : t("status.idle"),
-              tone: openCodexTone,
-            },
-            {
-              label: "health",
-              value: openCodex?.healthOk ? "200" : openCodex?.healthStatus ? String(openCodex.healthStatus) : "-",
-              tone: openCodex?.healthOk ? "ok" : "idle",
-            },
-          ]}
-        />
-        <div className="mt-4">
-          <DetailRow label={t("fields.sourcePath")} value={<span className="font-mono break-all">{openCodex?.sourcePath || "-"}</span>} />
-          <DetailRow label="host / port" value={`${openCodex?.host || "-"}:${openCodex?.port || "-"}`} />
-          <DetailRow label={t("fields.localUrl")} value={<span className="font-mono break-all">{openCodex?.localUrl || "-"}</span>} />
-          <DetailRow
-            label={t("fields.mobileUrl")}
-            value={
-              <span className="font-mono break-all">
-                {openCodex?.mobileUrl || t("common.none")}
-              </span>
-            }
-          />
-          <DetailRow
-            label={t("fields.lanAccess")}
-            value={openCodex?.lanAccessEnabled ? t("common.enabled") : t("common.disabled")}
-          />
-          <DetailRow label="CODEX_HOME" value={<span className="font-mono break-all">{openCodex?.codexHome || "-"}</span>} />
-          <DetailRow label={t("fields.sharedCodexHome")} value={<span className="font-mono break-all">{openCodex?.sharedCodexHome || "-"}</span>} />
-          <DetailRow label={t("fields.health")} value={<span className="font-mono break-all">{openCodex?.healthEndpoint || "-"}</span>} />
-          <DetailRow label={t("fields.logPath")} value={<span className="font-mono break-all">{openCodex?.logPath || "-"}</span>} />
-          <DetailRow label={t("fields.password")} value={openCodex?.authPasswordConfigured ? t("common.configured") : t("common.notConfigured")} />
-          {openCodex?.lastError && (
-            <DetailRow label={t("fields.lastError")} value={<span className="text-status-fail">{openCodex.lastError}</span>} />
-          )}
-        </div>
-        <div className="mt-3 rounded-md border border-status-warn/25 bg-status-warn/10 px-3 py-2 text-[12px] leading-[1.55] text-status-warn">
-          {t("pages.gateway.lanWarning")}
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <ToolbarButton
-            icon={<Play size={13} />}
-            variant="primary"
-            disabled={openCodexBusy || !openCodex?.exists || openCodex.running}
-            onClick={() => void runOpenCodexAction("opencodex_start", "feedback.openCodexStarted")}
-          >
-            {t("actions.start")}
-          </ToolbarButton>
-          <ToolbarButton
-            icon={<Globe size={13} />}
-            disabled={openCodexBusy || !openCodex?.exists || openCodex.running || !openCodex.authPasswordConfigured}
-            onClick={() => void runOpenCodexAction("opencodex_start_lan", "feedback.openCodexLanStarted")}
-          >
-            {t("actions.startLan")}
-          </ToolbarButton>
-          <ToolbarButton
-            icon={<Square size={13} />}
-            disabled={openCodexBusy || !openCodex?.managed}
-            onClick={() => void runOpenCodexAction("opencodex_stop", "feedback.openCodexStopped")}
-          >
-            {t("actions.stop")}
-          </ToolbarButton>
-          <ToolbarButton
-            icon={<RotateCcw size={13} />}
-            disabled={openCodexBusy || !openCodex?.exists}
-            onClick={() => void runOpenCodexAction("opencodex_restart", "feedback.openCodexRestarted")}
-          >
-            {t("actions.restart")}
-          </ToolbarButton>
-          <ToolbarButton
-            icon={<RotateCcw size={13} />}
-            disabled={openCodexBusy || !openCodex?.exists || !openCodex.authPasswordConfigured}
-            onClick={() => void runOpenCodexAction("opencodex_restart_lan", "feedback.openCodexLanStarted")}
-          >
-            {t("actions.restartLan")}
-          </ToolbarButton>
-          <ToolbarButton
-            icon={<Globe size={13} />}
-            disabled={!openCodex?.localUrl}
-            onClick={() => void openOpenCodexUrl("local")}
-          >
-            {t("actions.openLocalUrl")}
-          </ToolbarButton>
-          <ToolbarButton
-            icon={<Globe size={13} />}
-            disabled={!openCodex?.mobileUrlReachable}
-            onClick={() => void openOpenCodexUrl("mobile")}
-          >
-            {t("actions.openMobileUrl")}
-          </ToolbarButton>
-          <ToolbarButton
-            icon={<Activity size={13} />}
-            disabled={openCodexBusy}
-            onClick={() => void runOpenCodexAction("opencodex_open_logs", "feedback.openLogs")}
-          >
-            {t("actions.openLogs")}
-          </ToolbarButton>
-          <ToolbarButton icon={<TestTube2 size={13} />} disabled={openCodexBusy} onClick={() => void refreshOpenCodex()}>
-            {t("actions.refresh")}
-          </ToolbarButton>
-        </div>
-      </Panel>
-      <div className="grid grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)] gap-4">
-        <Panel title={t("pages.gateway.presetsTitle")} icon={<Cable size={15} />}>
-          <div className="flex flex-col gap-2">
-            {mockGateways.map((gateway) => (
-              <ListButton
-                key={gateway.id}
-                active={gateway.id === selected.id}
-                title={gateway.name}
-                subtitle={`${gateway.host}:${gateway.port} / ${gateway.adapter}`}
-                right={<StatusPill tone={running[gateway.id] ? "running" : gateway.status} />}
-                onClick={() => setSelectedId(gateway.id)}
-              />
-            ))}
-          </div>
-        </Panel>
-        <Panel title={t("pages.gateway.runtimeTitle")} icon={<Activity size={15} />} action={<StatusPill tone={status} />}>
-          <SummaryStrip
-            items={[
-              { label: "host", value: selected.host },
-              { label: "port", value: String(selected.port) },
-              { label: t("fields.status"), value: t(`status.${status}`), tone: status },
-            ]}
-          />
-          <div className="mt-4">
-            <DetailRow label={t("fields.adapter")} value={selected.adapter} />
-            <DetailRow label={t("fields.health")} value={<span className="font-mono">{selected.healthPath}</span>} />
-            <DetailRow label={t("fields.logPath")} value={<span className="font-mono break-all">{selected.logPath}</span>} />
-          </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <ToolbarButton
-              icon={<Play size={13} />}
-              variant="primary"
-              disabled={isRunning}
-              onClick={() => {
-                setRunning((current) => ({ ...current, [selected.id]: true }));
-                show("success", t("feedback.gatewayStarted", { name: selected.name }));
-              }}
-            >
-              {t("actions.start")}
-            </ToolbarButton>
-            <ToolbarButton
-              icon={<Square size={13} />}
-              disabled={!isRunning}
-              onClick={() => {
-                setRunning((current) => ({ ...current, [selected.id]: false }));
-                show("warning", t("feedback.gatewayStopped", { name: selected.name }));
-              }}
-            >
-              {t("actions.stop")}
-            </ToolbarButton>
-            <ToolbarButton icon={<Activity size={13} />} onClick={() => show("info", t("feedback.openLogs"))}>{t("actions.openLogs")}</ToolbarButton>
-          </div>
-        </Panel>
-      </div>
-      {/* Config Diff 子区块:展示 Gateway 启动可能改的 config 范围占位,M3 接入真实 diff */}
-      <div className="cb-surface p-4">
-        <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-ink-700">
-          <GitCompare size={14} /> {t("pages.gateway.diffSubsection")}
-        </div>
-        <div className="rounded-md bg-ink-900/5 p-3 font-mono text-[11px] leading-[1.7] text-ink-700">
-          <div className="text-ink-400"># Gateway 启动不会修改 ~/.codex/config.toml</div>
-          <div className="text-ink-400"># Gateway 只会改 ~/.codex/codex-box/opencodex/runtime 与 logs</div>
-          <div>
-            <span className="text-[#34C759]">+ </span>
-            CODEX_HOME={`"$HOME/.codex"`}
-          </div>
-          <div>
-            <span className="text-[#34C759]">+ </span>
-            HOST={"127.0.0.1"} PORT={"3737"}
-          </div>
-          <div className="text-ink-400"># 实际写入流程(draft → backup → diff → confirm → atomic write)M3 接入</div>
-        </div>
-      </div>
-    </PageShell>
-  );
-}
-
-export function MobileAccessPage() {
-  const { t } = useTranslation();
-  const { notice, show } = useNotice();
-  const [status, setStatus] = useState<OpenCodexStatus | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<ModelCatalogEntry[]>(mockModelCatalog);
+  const [config, setConfig] = useState<OpenCodexCustomConfig | null>(null);
+  const [activeProfile, setActiveProfile] = useState<ProfileView | null>(null);
+  const [selectedId, setSelectedId] = useState<string>(mockModelCatalog[0]?.modelId || "");
+  const [busy, setBusy] = useState(false);
+  const selected = catalog.find((item) => item.modelId === selectedId) || catalog[0];
 
   const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    const result = await invokeCmd<OpenCodexStatus>("opencodex_status");
-    setLoading(false);
-    if (result.ok) {
-      setStatus(result.data);
+    setBusy(true);
+    const snapshot = await invokeCmd<ConfigSnapshotView>("config_snapshot");
+    if (snapshot.ok) {
+      const profile = snapshot.data.profiles.find((p) => p.isActive) || snapshot.data.profiles[0] || null;
+      setActiveProfile(profile);
     } else {
-      setError(result.error);
+      show("warning", snapshot.error);
     }
-  }, []);
+    const opencodex = await invokeCmd<OpenCodexCustomConfig>("opencodex_config_read");
+    setBusy(false);
+    if (opencodex.ok) {
+      setConfig(opencodex.data);
+      setCatalog(opencodex.data.catalog.length > 0 ? opencodex.data.catalog : mockModelCatalog);
+      setSelectedId((current) =>
+        current && opencodex.data.catalog.some((entry) => entry.modelId === current)
+          ? current
+          : (opencodex.data.catalog[0]?.modelId || mockModelCatalog[0]?.modelId || "")
+      );
+    } else {
+      show("warning", opencodex.error);
+    }
+  }, [show]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  const onStart = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    const result = await invokeCmd<OpenCodexStatus>("opencodex_start");
-    setLoading(false);
+  const toggleVisibility = async (entry: ModelCatalogEntry) => {
+    if (!config) return;
+    const next: ModelCatalogEntry = { ...entry, visible: !entry.visible };
+    const request: OpenCodexWriteRequest<ModelCatalogEntry> = {
+      entry: next,
+      expectedHash: config.catalogContentHash,
+      note: null,
+    };
+    const result = await invokeCmd<OpenCodexWriteResult>("catalog_entry_upsert", { request });
     if (result.ok) {
-      setStatus(result.data);
-      show("success", t("feedback.gatewayStarted"));
+      show("success", t("feedback.modelVisibilityToggled", { name: entry.displayName || entry.modelId }));
+      await refresh();
     } else {
-      setError(result.error);
       show("warning", result.error);
     }
-  }, [show, t]);
-
-  const onStartLan = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    const result = await invokeCmd<OpenCodexStatus>("opencodex_start_lan");
-    setLoading(false);
-    if (result.ok) {
-      setStatus(result.data);
-      show("success", t("feedback.gatewayStartedLan"));
-    } else {
-      setError(result.error);
-      show("warning", result.error);
-    }
-  }, [show, t]);
-
-  const onOpenMobile = useCallback(async () => {
-    setError(null);
-    const result = await invokeCmd<OpenCodexStatus>("opencodex_open_url", { kind: "mobile" });
-    if (!result.ok) {
-      setError(result.error);
-      show("warning", result.error);
-    }
-  }, [show]);
-
-  const onOpenLocal = useCallback(async () => {
-    setError(null);
-    const result = await invokeCmd<OpenCodexStatus>("opencodex_open_url", { kind: null });
-    if (!result.ok) {
-      setError(result.error);
-      show("warning", result.error);
-    }
-  }, [show]);
+  };
 
   return (
     <PageShell
-      title={t("pages.mobileAccess.title")}
-      subtitle={t("pages.mobileAccess.subtitle")}
+      title={t("pages.models.title")}
+      subtitle={t("pages.models.subtitle")}
       notice={notice}
       action={
-        <div className="flex flex-wrap items-center gap-2">
-          <ToolbarButton icon={<RotateCcw size={13} />} onClick={() => void refresh()} disabled={loading}>
-            {t("actions.refresh")}
-          </ToolbarButton>
-          {status?.running ? (
-            <ToolbarButton icon={<Square size={13} />} onClick={onStartLan} disabled={loading}>
-              {t("actions.startLan")}
-            </ToolbarButton>
-          ) : (
-            <ToolbarButton icon={<Play size={13} />} variant="primary" onClick={onStart} disabled={loading}>
-              {t("actions.startLocal")}
-            </ToolbarButton>
-          )}
-        </div>
+        <ToolbarButton icon={<RotateCcw size={13} />} onClick={() => void refresh()} disabled={busy}>
+          {t("actions.refresh")}
+        </ToolbarButton>
       }
     >
-      <div className="grid grid-cols-[minmax(260px,0.85fr)_minmax(0,1.35fr)] gap-4">
-        <Panel title={t("pages.mobileAccess.qrTitle")} icon={<Smartphone size={15} />}>
-          {status?.mobileUrl ? (
-            <div className="flex flex-col items-center gap-3 py-4">
-              {/* 二维码占位:M3 接入 qrcode.react 后替换 */}
-              <div className="flex h-40 w-40 items-center justify-center rounded-md border border-ink-900/10 bg-white/70 text-[11px] text-ink-500">
-                {t("pages.mobileAccess.qrPlaceholder")}
-              </div>
-              <code className="break-all rounded bg-ink-900/5 px-2 py-1 text-[12px] text-ink-700">
-                {status.mobileUrl}
-              </code>
-            </div>
-          ) : (
-            <div className="py-6 text-center text-[12px] text-ink-500">
-              {t("pages.mobileAccess.lanOffHint")}
-            </div>
-          )}
-          <div className="mt-2 flex flex-wrap gap-2">
-            <ToolbarButton icon={<Cable size={13} />} onClick={onOpenLocal}>
-              {t("actions.openLocalUrl")}
-            </ToolbarButton>
-            <ToolbarButton icon={<Smartphone size={13} />} onClick={onOpenMobile} disabled={!status?.mobileUrlReachable}>
-              {t("actions.openMobileUrl")}
-            </ToolbarButton>
+      <SummaryStrip
+        items={[
+          { label: t("summary.totalModels"), value: String(catalog.length), tone: "ok" },
+          { label: t("summary.visibleModels"), value: String(catalog.filter((m) => m.visible).length) },
+          { label: t("summary.activeProfile"), value: activeProfile?.name || "-" },
+        ]}
+      />
+      <Panel title={t("pages.models.catalogSourceTitle")} icon={<GitCompare size={15} />}>
+        <DetailRow
+          label={t("fields.catalogPath")}
+          value={<span className="font-mono break-all">{config?.catalogPath || "~/.opencodex/custom_model_catalog.json"}</span>}
+        />
+        <DetailRow
+          label={t("fields.contentHash")}
+          value={<span className="font-mono break-all">{config?.catalogContentHash || "-"}</span>}
+        />
+        {config && !config.valid ? (
+          <div className="mt-3 rounded-md border border-status-fail/30 bg-status-fail/10 px-3 py-2 text-[12px] text-status-fail">
+            {t("feedback.opencodexParseErrors")}
+            <ul className="mt-1 list-disc pl-4">
+              {config.parseErrors.map((err) => (
+                <li key={err.file}>
+                  {err.file}: {err.message}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </Panel>
+      <div className="grid grid-cols-[minmax(300px,0.95fr)_minmax(0,1.4fr)] gap-4">
+        <Panel title={t("pages.models.listTitle")} icon={<Sparkles size={15} />}>
+          <div className="flex flex-col gap-2">
+            {catalog.map((entry) => (
+              <ListButton
+                key={entry.modelId}
+                active={entry.modelId === selected?.modelId}
+                title={entry.displayName || entry.modelId}
+                subtitle={`${entry.provider} · ${entry.modelId}`}
+                right={
+                  <span className="inline-flex items-center gap-1.5">
+                    {entry.reasoning?.enabled ? <StatusPill tone="running" /> : null}
+                    {entry.visible ? (
+                      <Eye size={12} className="text-status-ok" />
+                    ) : (
+                      <EyeOff size={12} className="text-ink-400" />
+                    )}
+                  </span>
+                }
+                onClick={() => setSelectedId(entry.modelId)}
+              />
+            ))}
           </div>
         </Panel>
-        <Panel title={t("pages.mobileAccess.infoTitle")} icon={<ShieldCheck size={15} />}>
-          <DetailRow label={t("fields.localUrl")} value={<span className="font-mono">{status?.localUrl ?? t("common.unknown")}</span>} />
-          <DetailRow
-            label={t("fields.lanUrl")}
-            value={
-              status?.lanUrls?.length
-                ? status.lanUrls.map((u) => <div key={u} className="font-mono">{u}</div>)
-                : t("common.none")
-            }
-          />
-          <DetailRow
-            label={t("fields.lanPassword")}
-            value={status?.authPasswordConfigured ? t("common.configured") : t("common.notConfigured")}
-          />
-          <DetailRow label={t("fields.running")} value={status?.running ? t("common.running") : t("common.stopped")} />
-          {error ? (
-            <div className="mt-3 rounded-md border border-[#FF9A9A]/40 bg-[#FFD6D6]/40 px-3 py-2 text-[12px] text-[#9B2C2C]">
-              {error}
+        <Panel
+          title={t("pages.models.detailTitle")}
+          icon={<Sparkles size={15} />}
+          action={
+            <ToolbarButton
+              icon={selected?.visible ? <EyeOff size={13} /> : <Eye size={13} />}
+              disabled={!selected || busy}
+              onClick={() => selected && void toggleVisibility(selected)}
+            >
+              {selected?.visible ? t("actions.hide") : t("actions.show")}
+            </ToolbarButton>
+          }
+        >
+          {selected ? (
+            <>
+              <DetailRow
+                label="model_id"
+                value={<span className="font-mono">{selected.modelId}</span>}
+              />
+              <DetailRow label={t("fields.provider")} value={selected.provider} />
+              <DetailRow
+                label={t("fields.displayName")}
+                value={selected.displayName || "-"}
+              />
+              <DetailRow
+                label={t("fields.visible")}
+                value={selected.visible ? t("common.enabled") : t("common.disabled")}
+              />
+              <DetailRow
+                label={t("fields.reasoning")}
+                value={
+                  selected.reasoning
+                    ? `${selected.reasoning.enabled ? t("common.enabled") : t("common.disabled")} · ${selected.reasoning.levels.join(", ")}`
+                    : t("common.disabled")
+                }
+              />
+              <DetailRow label={t("fields.note")} value={selected.note || "-"} />
+            </>
+          ) : (
+            <div className="py-6 text-center text-[12px] text-ink-500">
+              {t("common.none")}
             </div>
-          ) : null}
+          )}
+        </Panel>
+      </div>
+      <div className="cb-surface p-4">
+        <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-ink-700">
+          <Sparkles size={14} /> {t("pages.models.byokHint")}
+        </div>
+        <p className="text-[12px] leading-[1.6] text-ink-500">{t("pages.models.byokHintBody")}</p>
+      </div>
+    </PageShell>
+  );
+}
+
+/**
+ * ProviderRoutes 页面:管理 ~/.opencodex/providers.json 条目
+ * - 展示所有 provider 路由
+ * - 启用/禁用某个路由(对应 Codex App picker 是否出现该 provider 的模型)
+ * - 写入走 ~/.opencodex/providers.json
+ */
+export function ProviderRoutesPage() {
+  const { t } = useTranslation();
+  const { notice, show } = useNotice();
+  const [routes, setRoutes] = useState<ProviderRoute[]>(mockProviderRoutes);
+  const [config, setConfig] = useState<OpenCodexCustomConfig | null>(null);
+  const [selectedName, setSelectedName] = useState<string>(mockProviderRoutes[0]?.name || "");
+  const [busy, setBusy] = useState(false);
+  const selected = routes.find((item) => item.name === selectedName) || routes[0];
+
+  const refresh = useCallback(async () => {
+    setBusy(true);
+    const result = await invokeCmd<OpenCodexCustomConfig>("opencodex_config_read");
+    setBusy(false);
+    if (result.ok) {
+      setConfig(result.data);
+      setRoutes(result.data.providers.length > 0 ? result.data.providers : mockProviderRoutes);
+      setSelectedName((current) =>
+        current && result.data.providers.some((entry) => entry.name === current)
+          ? current
+          : (result.data.providers[0]?.name || mockProviderRoutes[0]?.name || "")
+      );
+    } else {
+      show("warning", result.error);
+    }
+  }, [show]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const toggleEnabled = async (route: ProviderRoute) => {
+    if (!config) return;
+    const next: ProviderRoute = { ...route, enabled: !route.enabled };
+    const request: OpenCodexWriteRequest<ProviderRoute> = {
+      entry: next,
+      expectedHash: config.providersContentHash,
+      note: null,
+    };
+    const result = await invokeCmd<OpenCodexWriteResult>("provider_route_upsert", { request });
+    if (result.ok) {
+      show("success", t("feedback.providerRouteToggled", { name: route.name }));
+      await refresh();
+    } else {
+      show("warning", result.error);
+    }
+  };
+
+  const removeRoute = async (route: ProviderRoute) => {
+    if (!config) return;
+    const request: OpenCodexDeleteRequest = {
+      key: route.name,
+      expectedHash: config.providersContentHash,
+      note: null,
+    };
+    const result = await invokeCmd<OpenCodexWriteResult>("provider_route_delete", { request });
+    if (result.ok) {
+      show("warning", t("feedback.providerRouteDeleted", { name: route.name }));
+      await refresh();
+    } else {
+      show("warning", result.error);
+    }
+  };
+
+  return (
+    <PageShell
+      title={t("pages.providerRoutes.title")}
+      subtitle={t("pages.providerRoutes.subtitle")}
+      notice={notice}
+      action={
+        <ToolbarButton icon={<RotateCcw size={13} />} onClick={() => void refresh()} disabled={busy}>
+          {t("actions.refresh")}
+        </ToolbarButton>
+      }
+    >
+      <SummaryStrip
+        items={[
+          { label: t("summary.totalRoutes"), value: String(routes.length) },
+          {
+            label: t("summary.enabledRoutes"),
+            value: String(routes.filter((r) => r.enabled).length),
+            tone: "ok",
+          },
+          {
+            label: t("summary.disabledRoutes"),
+            value: String(routes.filter((r) => !r.enabled).length),
+            tone: routes.some((r) => !r.enabled) ? "warn" : "idle",
+          },
+        ]}
+      />
+      <Panel title={t("pages.providerRoutes.sourceTitle")} icon={<GitCompare size={15} />}>
+        <DetailRow
+          label={t("fields.providersPath")}
+          value={<span className="font-mono break-all">{config?.providersPath || "~/.opencodex/providers.json"}</span>}
+        />
+        <DetailRow
+          label={t("fields.contentHash")}
+          value={<span className="font-mono break-all">{config?.providersContentHash || "-"}</span>}
+        />
+      </Panel>
+      <div className="grid grid-cols-[minmax(280px,0.95fr)_minmax(0,1.4fr)] gap-4">
+        <Panel title={t("pages.providerRoutes.listTitle")} icon={<Route size={15} />}>
+          <div className="flex flex-col gap-2">
+            {routes.map((route) => (
+              <ListButton
+                key={route.name}
+                active={route.name === selected?.name}
+                title={route.name}
+                subtitle={`${route.wireApi} · ${route.baseUrl}`}
+                right={<StatusPill tone={route.enabled ? "ok" : "idle"} />}
+                onClick={() => setSelectedName(route.name)}
+              />
+            ))}
+          </div>
+        </Panel>
+        <Panel
+          title={t("pages.providerRoutes.detailTitle")}
+          icon={<Server size={15} />}
+          action={
+            <div className="flex flex-wrap gap-2">
+              <ToolbarButton
+                icon={<CheckCircle2 size={13} />}
+                disabled={!selected || busy}
+                onClick={() => selected && void toggleEnabled(selected)}
+              >
+                {selected?.enabled ? t("actions.disable") : t("actions.enable")}
+              </ToolbarButton>
+              <ConfirmButton
+                idleLabel={t("actions.delete")}
+                confirmLabel={t("actions.confirmDelete")}
+                disabled={!selected || busy}
+                onConfirm={() => selected && void removeRoute(selected)}
+              />
+            </div>
+          }
+        >
+          {selected ? (
+            <>
+              <DetailRow label="name" value={<span className="font-mono">{selected.name}</span>} />
+              <DetailRow label="base_url" value={<span className="font-mono break-all">{selected.baseUrl}</span>} />
+              <DetailRow label="wire_api" value={<span className="font-mono">{selected.wireApi}</span>} />
+              <DetailRow label="api_key_ref" value={selected.apiKeyRef ? <SecretText value={selected.apiKeyRef} /> : "-"} />
+              <DetailRow
+                label={t("fields.enabled")}
+                value={selected.enabled ? t("common.enabled") : t("common.disabled")}
+              />
+              <DetailRow label={t("fields.note")} value={selected.note || "-"} />
+              <DetailRow
+                label="http_headers"
+                value={
+                  Object.keys(selected.httpHeaders).length > 0
+                    ? Object.entries(selected.httpHeaders)
+                        .map(([k, v]) => `${k}=${v}`)
+                        .join(" · ")
+                    : "-"
+                }
+              />
+            </>
+          ) : (
+            <div className="py-6 text-center text-[12px] text-ink-500">
+              {t("common.none")}
+            </div>
+          )}
         </Panel>
       </div>
     </PageShell>
   );
 }
 
+/**
+ * Codex Runtime 页面:Codex Desktop / CLI / ~/.opencodex/ 只读检测
+ * 取代 v0.2 的"OpenCodex 检出"语义:不再有外部 OpenCodex 进程,只剩"Codex 桌面安装检测 + BYOK JSON 文件位置"。
+ */
 export function CodexRuntimePage() {
   const { t } = useTranslation();
-  const { notice } = useNotice();
-  const [status, setStatus] = useState<OpenCodexStatus | null>(null);
+  const { notice, show } = useNotice();
+  const [status, setStatus] = useState<CodexRuntimeStatus>(mockCodexRuntime);
+  const [opencodex, setOpencodex] = useState<OpenCodexCustomConfig | null>(null);
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const result = await invokeCmd<OpenCodexStatus>("opencodex_status");
+    // 当前 MVP 阶段 codex_runtime_status 没有实现,直接展示 mock + opencodex read
+    void invokeCmd<OpenCodexCustomConfig>("opencodex_config_read").then((result) => {
+      if (result.ok) {
+        setOpencodex(result.data);
+        setStatus((current) => ({
+          ...current,
+          opencodexDir: result.data.providersPath.replace(/\/[^/]+$/, ""),
+          opencodexDirExists: true,
+        }));
+      } else {
+        show("warning", result.error);
+      }
+    });
     setLoading(false);
-    if (result.ok) {
-      setStatus(result.data);
-    }
-  }, []);
+  }, [show]);
 
   useEffect(() => {
     void refresh();
@@ -1527,71 +1514,76 @@ export function CodexRuntimePage() {
         </ToolbarButton>
       }
     >
+      <SummaryStrip
+        items={[
+          { label: t("fields.desktopInstalled"), value: status.desktopInstalled ? t("common.detected") : t("common.missing"), tone: status.desktopInstalled ? "ok" : "warn" },
+          { label: t("fields.cliAvailable"), value: status.cliAvailable ? t("common.detected") : t("common.missing"), tone: status.cliAvailable ? "ok" : "warn" },
+          { label: t("fields.opencodexDir"), value: opencodex ? t("common.detected") : t("common.notFound") },
+        ]}
+      />
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Panel title={t("pages.codexRuntime.checkoutTitle")} icon={<Server size={15} />}>
-          <DetailRow
-            label={t("fields.opencodexSource")}
-            value={<span className="font-mono break-all">{status?.sourcePath ?? t("common.unknown")}</span>}
-          />
-          <DetailRow
-            label={t("fields.exists")}
-            value={status?.exists ? t("common.found") : t("common.missing")}
-          />
-          <DetailRow
-            label={t("fields.configYaml")}
-            value={<span className="font-mono break-all">{status?.configYamlPath ?? t("common.unknown")}</span>}
-          />
-          <DetailRow
-            label={t("fields.configExists")}
-            value={status?.configExists ? t("common.found") : t("common.missing")}
-          />
-        </Panel>
-        <Panel title={t("pages.codexRuntime.sharedTitle")} icon={<Cpu size={15} />}>
+        <Panel title={t("pages.codexRuntime.desktopTitle")} icon={<Server size={15} />}>
           <DetailRow
             label={t("fields.codexHome")}
-            value={<span className="font-mono break-all">{status?.codexHome ?? t("common.unknown")}</span>}
+            value={<span className="font-mono break-all">{status.codexHome}</span>}
           />
           <DetailRow
-            label={t("fields.runtimeDir")}
-            value={<span className="font-mono break-all">{status?.runtimeDir ?? t("common.unknown")}</span>}
+            label={t("fields.codexCliPath")}
+            value={<span className="font-mono break-all">{status.codexCliPath || t("common.unknown")}</span>}
           />
           <DetailRow
-            label={t("fields.logPath")}
-            value={<span className="font-mono break-all">{status?.logPath ?? t("common.unknown")}</span>}
+            label={t("fields.codexDesktopAppPath")}
+            value={<span className="font-mono break-all">{status.codexDesktopAppPath || t("common.unknown")}</span>}
           />
           <DetailRow
-            label={t("fields.healthEndpoint")}
-            value={<span className="font-mono break-all">{status?.healthEndpoint ?? t("common.unknown")}</span>}
+            label={t("fields.codexDesktopVersion")}
+            value={status.codexDesktopVersion || t("common.unknown")}
           />
           <DetailRow
-            label={t("fields.health")}
+            label={t("fields.configReadable")}
+            value={status.configReadable ? t("common.enabled") : t("common.disabled")}
+          />
+        </Panel>
+        <Panel title={t("pages.codexRuntime.opencodexTitle")} icon={<Cpu size={15} />}>
+          <DetailRow
+            label={t("fields.opencodexDir")}
             value={
-              status?.healthOk
-                ? `${t("common.ok")}${status.healthStatus ? ` (${status.healthStatus})` : ""}`
-                : t("common.notReady")
+              <span className="font-mono break-all">
+                {opencodex ? opencodex.providersPath.replace(/\/[^/]+$/, "") : status.opencodexDir}
+              </span>
             }
+          />
+          <DetailRow
+            label={t("fields.providersPath")}
+            value={<span className="font-mono break-all">{opencodex?.providersPath || "~/.opencodex/providers.json"}</span>}
+          />
+          <DetailRow
+            label={t("fields.catalogPath")}
+            value={<span className="font-mono break-all">{opencodex?.catalogPath || "~/.opencodex/custom_model_catalog.json"}</span>}
+          />
+          <DetailRow
+            label={t("fields.providersCount")}
+            value={String(opencodex?.providers.length || 0)}
+          />
+          <DetailRow
+            label={t("fields.catalogCount")}
+            value={String(opencodex?.catalog.length || 0)}
+          />
+          <DetailRow
+            label={t("fields.readAt")}
+            value={<span className="font-mono break-all">{opencodex?.readAt || "-"}</span>}
           />
         </Panel>
       </div>
+      <div className="cb-surface p-4">
+        <div className="mb-2 flex items-center gap-2 text-[12px] font-medium text-ink-700">
+          <ShieldCheck size={14} /> {t("pages.codexRuntime.readonlyHint")}
+        </div>
+        <p className="text-[12px] leading-[1.6] text-ink-500">
+          {t("pages.codexRuntime.readonlyHintBody")}
+        </p>
+      </div>
     </PageShell>
-  );
-}
-
-function DiffLine({ line }: { line: DiffLineView }) {
-  const prefix = line.kind === "insert" ? "+" : line.kind === "delete" ? "-" : line.kind === "change" ? "~" : " ";
-  const cls =
-    line.kind === "insert"
-      ? "text-[#9BE7B1]"
-      : line.kind === "delete"
-        ? "text-[#FF9A9A]"
-        : line.kind === "change"
-          ? "text-[#FFD18A]"
-          : "text-white/60";
-  return (
-    <div className={`min-h-[20px] whitespace-pre-wrap break-all ${cls}`}>
-      <span className="mr-2 select-none text-white/30">{prefix}</span>
-      {line.content}
-    </div>
   );
 }
 
@@ -1675,9 +1667,9 @@ export function SettingsPage() {
     redaction: true,
     maxSize: true,
     exportReport: true,
-    gatewayPresets: true,
-    pluginDirs: false,
-    desktopScan: false,
+    byokWriteEnabled: true,
+    byokSchemaPreserve: true,
+    byokVisibilitySync: true,
   });
   const selected = mockSettingsSections.find((item) => item.id === selectedId) || mockSettingsSections[0];
 
