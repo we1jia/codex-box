@@ -1,141 +1,129 @@
-# Codex Box · PRD v0.2
+# Codex Box · PRD v0.3
 
-> 围绕 Codex Desktop / Codex CLI 的本地控制台、配置管理器与 OpenCodex 能力复现层
-> 状态：v0.2 基线 · 2026-06-25
+> 让 Codex App 的模型下拉支持 BYOK:官方订阅、官方 API、第三方 OpenAI-compatible(含国产)、本地 gateway 进同一个 picker
+> 状态:v0.3 基线 · 2026-06-25
+> 替代:[PRD.v0.2-archived-20260625.md](./PRD.v0.2-archived-20260625.md)(v0.2 把项目定性为"复现 OpenCodex 的 Web 中间层",与 AITabby/opencodex 的真实定位不符)
 
 ---
 
 ## 1. 产品定位
 
-**Codex Box** 是一个面向 OpenAI Codex 用户的本地桌面控制台。
+**Codex Box** 是一个面向 OpenAI Codex 用户的本地桌面控制台,通过安全读写 `~/.codex/config.toml` 实现 **BYOK 模型下拉**。
 
-它要做三件事：
+它要做三件事:
 
-1. **复现 OpenCodex 的核心使用价值**：让手机、平板、另一台电脑可以通过浏览器访问目标机器上的 Codex 工作流。
-2. **保留 Codex Box 自有体验**：使用 Tauri + React 做原生桌面控制台，采用 Mac Dashboard + frosted glass 视觉，不复制 OpenCodex 的 Web shell UI。
-3. **提供安全配置管理**：可视化管理 `~/.codex/config.toml`、profile、provider、gateway、诊断、备份和 diff。
+1. **BYOK 模型下拉**:让 Codex App 的模型选择里同时出现 — 官方订阅、OpenAI 官方 API、第三方 OpenAI-compatible(含国产模型)、本地/中间层 gateway;切换时整组 `provider + model + reasoning` 一起切。
+2. **保留 Codex Box 自有体验**:使用 Tauri + React 做原生桌面控制台,采用 Mac Dashboard + frosted glass 视觉,不复用任何外部项目的 UI 实现。
+3. **安全配置管理**:可视化管理 `~/.codex/config.toml`、profile、provider、备份、diff,写入严格走 backup → diff → confirm → atomic write → rollback。
 
-一句话：
+一句话:
 
-> Codex Box = OpenCodex 核心能力复现 + 桌面端控制台 + Codex 配置安全管理。
+> Codex Box = BYOK 模型下拉控制台 + 桌面端 Codex 配置安全管理。
 
 ---
 
 ## 2. 目标用户
 
 - 高频使用 `Codex CLI` / `Codex Desktop` 的开发者
-- 想在手机、平板或另一台电脑上访问本机 Codex 的用户
-- 需要在官方订阅、OpenAI API、OpenAI-compatible API、本地 gateway 间切换的用户
+- 想在 Codex App 模型下拉里同时管理订阅、官方 API、第三方 API(含国产)、本地 gateway 的用户
+- 想用统一 `~/.codex/config.toml` 视角管理多 profile、多 provider 的用户
 - 需要安全修改 `~/.codex/config.toml` 的用户
-- 需要诊断 Codex Desktop、Codex CLI、gateway、provider、MCP、network 状态的用户
+- 同时使用 AITabby/opencodex CLI 与 Codex Box 的用户(共享 `~/.opencodex/*.json` 路径约定)
 
 ---
 
 ## 3. MVP 目标
 
-v0.2 的 MVP 不再只是配置管理器，而是要跑通四条主路径：
+v0.3 的 MVP 跑通四条主路径:
 
-1. **看得清**：Dashboard 结构化展示 Codex config、profile、provider、gateway、runtime 状态。
-2. **改得稳**：所有 `~/.codex/config.toml` 写入必须 backup、diff、confirm、atomic write、rollback。
-3. **连得上**：内置 gateway runtime 支持本机访问、LAN 访问、访问密码、health check、日志。
-4. **查得快**：Diagnostics 能检查 config、runtime、port、auth、provider、MCP、network。
+1. **看得清**:Dashboard 结构化展示 Codex config 状态、active profile、provider 列表(订阅 / 官方 / 第三方 / 本地)、`~/.opencodex/` 自有配置、Codex Desktop 安装情况。
+2. **改得稳**:所有 `~/.codex/config.toml` 与 `~/.opencodex/*.json` 写入走 backup → diff → confirm → atomic write → rollback,secret 走 env 引用,绝不写日志。
+3. **加得动**:用户能在 UI 里新增 / 删除 / 启用 / 禁用 provider,新增 / 删除 / 切换 model,新增 / 删除 profile;每条改动都立即可回滚。
+4. **查得快**:Diagnostics 能检查 config 语法、Codex Desktop 安装、`~/.opencodex/*.json` 完整性、provider URL 可达性、env 变量是否存在。
 
 ---
 
 ## 4. P0 功能范围
 
-### Overview
+### 4.1 Models(模型下拉预览)
 
-- 当前 active profile、provider、model、network、MCP 摘要
-- Gateway 运行状态、本机 URL、LAN URL、health 状态
-- Codex Runtime 状态：Codex Desktop / Codex CLI / `CODEX_HOME`
-- 最近错误、最近备份、快速入口
+- 展示当前 Codex App 可见的模型列表(官方订阅、官方 API、OpenAI-compatible 第三方、本地 gateway)
+- 每个模型显示:display name / 归属 provider / 可见性 toggle / 切换入口
+- 切换模型 = 切到对应 profile 或修改 active profile 的 `model + model_provider`
+- 切换前展示 diff 与回滚点
 
-### Gateway
+### 4.2 Provider Routes(多 provider 路由)
 
-- 管理内置 gateway runtime 的启动、停止、重启
-- 管理 host、port、local URL、LAN URL、runtime dir、log path
-- 默认只监听 `127.0.0.1`
-- LAN 模式必须先配置访问密码
-- health endpoint、端口占用检测、日志查看
-- 现阶段可以临时托管外部 OpenCodex checkout，但目标是移除硬编码外部依赖，收敛为 Codex Box 自有 runtime 模块
+- 维护 `~/.opencodex/providers.json`(AITabby 约定)
+- 支持:
+  - 官方订阅(`codex-subscription`):只做状态识别,绝不读 token
+  - 官方 API(`openai-official-api`):`https://api.openai.com/v1` + `OPENAI_API_KEY`
+  - OpenAI-compatible(`compatible-api`):任意 base_url + wire_api + env 引用 key
+  - 本地 gateway(`local-gateway`):Codex Box 自有 runtime 或用户显式配置 endpoint
+- "新增 provider"会写 `~/.opencodex/providers.json` + 在 `~/.codex/config.toml` 的 `[model_providers.*]` 段加表
 
-### Mobile Access
+### 4.3 Custom Model Catalog(自定义模型目录)
 
-- 展示手机访问 URL、LAN IP、二维码
-- 明确区分“候选 LAN 地址”和“已启用移动访问”
-- 启用条件：gateway running + LAN host + password configured
-- 安全提示：默认本机访问，不自动暴露局域网
+- 维护 `~/.opencodex/custom_model_catalog.json`(AITabby 约定)
+- 用户在 Codex Box 里"加模型"会落在这份 JSON
+- 拼装进 `~/.codex/config.toml` 的 `[model_providers.*].models` 字段
 
-### Codex Runtime
+### 4.4 Profiles(工作配置)
 
-- 检测 Codex Desktop 是否安装
-- 检测 Codex CLI 是否存在
-- 检测 `CODEX_HOME` 是否可读
-- 只读扫描官方资源；不默认解包、patch 或修改 Codex Desktop 内部文件
-- 记录 runtime path、cache path、共享状态
-
-### Profiles
-
-- 展示 profile config
-- 新建、编辑、删除 profile
+- 展示 profile 列表(每个 profile 绑定 `model + model_provider + reasoning + sandbox + approval + network + mcp_refs`)
+- 新建 / 编辑 / 删除 profile
 - 设置 active / default profile
-- profile 是模型切换入口，绑定 `model + model_provider + sandbox + approval + network + mcp_refs`
-- 首次新增第三方 provider 时，必须保留官方订阅 profile，避免把官方订阅入口覆盖掉
+- 切换 profile 即切换整套配置
+- 首次新增第三方 provider 时,必须保留官方订阅 profile,避免把官方入口覆盖掉
 
-### Providers
+### 4.5 Codex Runtime(Codex Desktop 检测,只读)
 
-- 管理 `model_provider / model_providers`
-- 支持：
-  - OpenAI subscription（只做状态识别，不复用 token）
-  - OpenAI official API
-  - OpenAI-compatible API
-  - local gateway
-  - codex-proxy / CLIProxyAPI 预设
-- 第三方 API 必须显式使用 `base_url + env secret` 引用
-- secret 不明文展示、不写日志、不导出
+- 检测 Codex Desktop 是否安装、版本、二进制路径
+- 检测 Codex CLI 是否存在
+- 检测 `CODEX_HOME` 与 `~/.codex/config.toml` 可读性
+- **不**修改 Codex Desktop 内部文件,**不**解包 `app.asar`,**不** patch IPC
 
-### Config 管理
+### 4.6 Config 管理
 
 - 读取、解析、展示 `~/.codex/config.toml`
 - 写入前生成结构化 diff 和文本 diff
 - 写入前自动 backup
 - atomic write 写回
 - 写入失败 rollback 到最近一次 backup
-- 回滚到历史备份
+- 支持回滚到历史 backup
 
-### Diagnostics
+### 4.7 Diagnostics
 
 - Config 语法检查
-- Codex Desktop 安装检测
-- Codex CLI / `CODEX_HOME` 检测
-- Gateway port / health / auth 检测
-- Provider endpoint 检测
-- MCP server command / path / env 检测
-- Network direct / proxy 连通性检测
+- Codex Desktop 安装检测(只读)
+- `~/.opencodex/*.json` 完整性
+- provider URL 可达性
+- env 变量存在性
 - 输出可复制的脱敏诊断报告
 
-### Settings
+### 4.8 Settings
 
 - 语言、主题、启动行为
-- gateway 默认 host、port、LAN 访问策略
-- 访问密码配置
-- 日志大小和保留策略
+- 写入策略(默认强制 backup + diff + confirm)
+- secret 脱敏(默认开启)
 - 备份保留策略
+- 日志大小和保留策略
 - 实验功能开关
 
 ---
 
-## 5. 暂缓范围
+## 5. 暂缓范围(红线)
 
-- 抓取、复用或转发官方账号 token
-- 自动登录 / OAuth 接管 / 登录绕过
-- 规避 rate limit / 账号配额限制
-- 默认修改 Codex Desktop 内部文件
-- 默认解包官方 `app.asar`
-- 接管系统全局代理
-- 团队同步 SaaS / 上传用户配置
-- 无沙箱第三方插件系统
+- ❌ 抓取、复用或转发官方账号 token
+- ❌ 自动登录 / OAuth 接管 / 登录绕过
+- ❌ 规避 rate limit / 账号配额限制
+- ❌ 默认修改 Codex Desktop 内部文件(`app.asar` / renderer / IPC)
+- ❌ 默认解包 `app.asar`
+- ❌ 接管系统全局代理
+- ❌ 团队同步 SaaS / 上传用户配置
+- ❌ 复制 AITabby/opencodex 源码、UI、长段文案
+- ❌ spawn 外部 AITabby/opencodex 进程(走独立 runtime 不走外部 launcher)
+- ❌ 引入无沙箱第三方插件系统
 
 ---
 
@@ -144,15 +132,15 @@ v0.2 的 MVP 不再只是配置管理器，而是要跑通四条主路径：
 | 页面 | 说明 |
 |---|---|
 | `Overview` | 总览、当前状态、快速入口 |
-| `Gateway` | 内置 gateway runtime 启停、端口、日志、health |
-| `Mobile Access` | 手机访问 URL、LAN 状态、二维码、安全提示 |
-| `Codex Runtime` | Codex Desktop / CLI / CODEX_HOME 检测 |
+| `Models` | 模型下拉预览 + 切换 |
+| `Provider Routes` | 多 provider 路由 + 新增 / 编辑 / 启用 / 禁用 |
+| `Codex Runtime` | Codex Desktop / CLI / CODEX_HOME 检测(只读) |
 | `Profiles` | 工作配置管理 |
-| `Providers` | 模型来源管理 |
+| `Custom Model Catalog` | 自定义模型目录管理(可选内嵌) |
 | `Diagnostics` | 诊断与脱敏报告 |
 | `Settings` | 应用设置 |
 
-`MCP / Network / Config Diff` 暂时作为相关页面中的能力区块，不单独放入主导航；功能稳定后再拆。
+`Config Diff` 作为相关页面中的能力区块,不单独放入主导航;功能稳定后再拆。
 
 ---
 
@@ -161,31 +149,31 @@ v0.2 的 MVP 不再只是配置管理器，而是要跑通四条主路径：
 - `CodexConfigSnapshot`
 - `CodexProfile`
 - `ModelProvider`
-- `GatewayRuntime`
-- `GatewayAccess`
+- `ModelCatalogEntry`(自定义模型目录条目)
+- `ProviderRoute`(`~/.opencodex/providers.json` 条目)
+- `OpenCodexCustomConfig`(`~/.opencodex/custom_model_catalog.json` 完整快照)
 - `CodexRuntimeStatus`
-- `NetworkRoute`
-- `McpServer`
 - `BackupRecord`
 - `HealthStatus`
 - `SecretRef`
 - `ConfigChangePreview`
 
-详细字段定义见 [docs/data-model/v0.2.md](./docs/data-model/v0.2.md)。
+详细字段定义见 [docs/data-model/v0.3-BYOK.md](./docs/data-model/v0.3-BYOK.md)。
 
 ---
 
 ## 8. 技术方向
 
-- Desktop：`Tauri`
-- Frontend：`React + TypeScript`
-- UI：`Tailwind CSS + shadcn/ui`
-- Backend：`Rust`
-- Config：`toml` crate + 后续按写入需求引入保格式能力
-- Diff：结构化 diff + 文本 diff
-- Gateway：Codex Box 自有 runtime 模块，吸收 OpenCodex 的功能事实，不复制其 UI 和长段实现
-- State：`zustand` + `@tanstack/react-query`
-- 写入策略：backup first + diff confirm + atomic write + rollback
+- Desktop:`Tauri`
+- Frontend:`React + TypeScript`
+- UI:`Tailwind CSS + shadcn/ui`
+- Backend:`Rust`
+- Config 解析:`toml` crate + 自写保格式层
+- JSON 解析:`serde_json`(用于 `~/.opencodex/*.json`)
+- Diff:结构化 diff + 文本 diff(`similar` crate)
+- 写入策略:backup first + diff confirm + atomic write + rollback
+- State:`zustand` + `@tanstack/react-query`
+- 绝不引入 Redux / MobX / 任何 CSS-in-JS / 任何 ORM / 任何 token 持久化方案
 
 ---
 
@@ -195,11 +183,11 @@ v0.2 的 MVP 不再只是配置管理器，而是要跑通四条主路径：
 |---|---|---|
 | M0 | Tauri 读取/写入 TOML、backup、diff、atomic write | 已完成 |
 | M1 | 只读 Dashboard / Overview | 已完成 |
-| M2 | Provider / Profile MVP，写入闭环，共存迁移 | 部分完成 |
-| M2.5 | OpenCodex 能力复现底座：gateway / auth / runtime locator / log / health | 进行中 |
-| M3 | Gateway / Mobile Access / Codex Runtime 页面接真实 runtime | 待开始 |
+| M2 | Provider / Profile MVP,写入闭环,共存迁移 | 部分完成 |
+| M2.5 | **BYOK 模型目录与多 provider 路由底座**(替代旧的"OpenCodex 能力复现底座") | 进行中 |
+| M3 | Models / Provider Routes / Codex Runtime 页面接真实配置 | 待开始 |
 | M4 | Diagnostics / Settings 接通真实检查与配置 | 待开始 |
-| M5 | 桌面体验打磨：system tray、备份时间线、导入导出 | 待开始 |
+| M5 | 桌面体验打磨:system tray、备份时间线、导入导出 | 待开始 |
 
 ---
 
@@ -210,28 +198,35 @@ v0.2 的 MVP 不再只是配置管理器，而是要跑通四条主路径：
 - 不抓取任何账号 token
 - 不绕过 OpenAI 官方登录
 - 不规避 rate limit / 账号配额限制
-- 不默认修改 Codex Desktop 内部文件
-- 不接管系统全局代理
+- **不**默认修改 Codex Desktop 内部文件(`app.asar`、renderer、IPC)
+- **不**接管系统全局代理
 - 不上传任何用户配置
-- 不复制 OpenCodex 的 UI、长段文案或源码实现
+- 不复制 AITabby/opencodex 源码、UI、长段文案
 
-### OpenCodex 兼容边界
+### AITabby/opencodex 兼容边界
 
-- OpenCodex 是 AGPL-3.0 项目；Codex Box 只吸收公开功能事实、运行方式、配置字段、health 行为和安全边界。
-- 如直接复制或派生 OpenCodex 代码，必须先单独评估许可证义务并在 ADR 中确认。
-- Codex Box 的实现应保持独立代码路径。
+- Codex Box 复用 AITabby/opencodex 在 `~/.opencodex/*.json` 的路径与字段约定,允许用户同时使用 AITabby CLI 与 Codex Box。
+- Codex Box 不 spawn AITabby/opencodex 进程,不复用其源码,实现完全独立。
+- 详细事实见 [docs/references/aitabby-opencodex.md](./docs/references/aitabby-opencodex.md)。
 
 ### 写入红线
 
 - 任何 `~/.codex/config.toml` 写入必须先 backup
 - 写入前必须展示 diff 并由用户确认
-- 写入必须 atomic write（写 `.tmp` → `rename`）
+- 写入必须 atomic write(写 `.tmp` → `rename`)
 - 写入失败必须 rollback 到最近一次 backup
 - 并发写入必须校验 `content_hash`
+- 任何 `~/.opencodex/*.json` 写入走相同闭环
 
 ### 隐私红线
 
-- secret 字段（API key、token、password）永远不写日志
+- secret 字段(API key、token、password)永远不写日志
 - UI 只展示 env key 名和脱敏显示
 - 诊断报告默认脱敏
 - 不上传任何用户配置到外部服务
+
+---
+
+## 版本
+
+- v0.3 · 2026-06-25 · BYOK 模型下拉与多 provider 路由主线收敛

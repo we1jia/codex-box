@@ -1,3 +1,11 @@
+# ADR 0004 · OpenCodex 能力复现策略 · SUPERSEDED
+
+> ⚠️ **状态:Superseded · 2026-06-25**
+> 本 ADR 的"Web 中间层 / 远程访问"复现策略与 AITabby/opencodex 的真实定位("unlocks Codex Desktop for third-party APIs" / BYOK 模型下拉)不符,已被 ADR-0005 替代。
+> 保留本文件仅作历史参考,后续 AI 不得按本文件继续执行。
+
+---
+
 # ADR 0004 · OpenCodex 能力复现策略
 
 > 状态：Accepted

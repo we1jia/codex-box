@@ -1,7 +1,7 @@
 # AGENTS.md · Codex Box
 
 > 给所有 AI 代理（Claude / Codex / 其他）的工作规范
-> 最后更新：2026-06-25
+> 最后更新：2026-06-25 · v0.3 收敛 BYOK 主线
 
 ---
 
@@ -23,22 +23,24 @@
 ## 项目边界
 
 ### 这是什么
-Codex Box 是面向 OpenAI Codex 的**本地桌面控制台、配置管理器与 OpenCodex 能力复现层**。
+Codex Box 是面向 OpenAI Codex 的**本地桌面控制台与 BYOK 模型下拉控制台**。
 
 - 技术栈：`Tauri + React + TypeScript + Tailwind + shadcn/ui + Rust`
-- 数据源：`~/.codex/config.toml`（主）、`~/.codex/codex-box/`（自有）
+- 数据源：`~/.codex/config.toml`（主，写入触发 Codex App 重读）、`~/.codex/codex-box/`（自有配置/备份/日志）、`~/.opencodex/`（与 AITabby/opencodex 共享约定）
 - 风格：现代 Mac Dashboard + frosted glass
-- 主线：复现 OpenCodex 的 gateway / mobile access / runtime 管理核心能力，但保持独立代码路径和自有 UI
+- 主线：通过安全读写 `~/.codex/config.toml`，让 Codex App 的模型下拉支持 BYOK（官方订阅 / 官方 API / 第三方 OpenAI-compatible 含国产 / 本地 gateway），切换时整组 `provider + model + reasoning` 一起切。不 spawn 外部 gateway 进程、不 patch Codex Desktop、不抓 token。
 
 ### 绝对不做（红线）
 - ❌ 抓取任何账号 token
 - ❌ 绕过 OpenAI 官方登录
 - ❌ 规避 rate limit / 账号配额限制
-- ❌ 默认修改 Codex Desktop 内部文件
+- ❌ 默认修改 Codex Desktop 内部文件（`app.asar` / renderer / IPC）
 - ❌ 接管系统全局代理
 - ❌ 团队同步 SaaS / 上传任何用户配置
+- ❌ 复制 AITabby/opencodex 源码、UI、长段文案
+- ❌ spawn 外部 AITabby/opencodex 进程
 
-详见 [PRD.md §12](./PRD.md)。
+详见 [PRD.md §5 §10](./PRD.md)。
 
 ### 写入红线（硬规则）
 - ✅ 任何 `~/.codex/config.toml` 写入前**必须**先 backup
@@ -53,12 +55,19 @@ Codex Box 是面向 OpenAI Codex 的**本地桌面控制台、配置管理器与
 
 ### 文档位置
 ```
-PRD.md                              # 产品需求
-docs/architecture/v0.2.md           # 整体架构、页面结构、数据流
+PRD.md                              # 产品需求（v0.3 BYOK 主线）
+docs/architecture/v0.3-BYOK.md      # 整体架构、页面结构、数据流
 docs/design/v0.1.md                 # UI 设计规范 + 线框图
-docs/data-model/v0.2.md             # 数据模型
+docs/data-model/v0.3-BYOK.md        # 数据模型
 docs/decisions/                     # 关键决策日志（ADR）
+  └─ 0005-BYOK-模型下拉与多-provider-路由.md  ← 当前主线
+  └─ 0004-OpenCodex-能力复现策略.superseded-20260625.md  ← 已 superseded
 docs/references/                    # 第三方项目技术事实与参考资料
+  └─ aitabby-opencodex.md           ← 当前参考项目
+  └─ opencodex-technical-notes.archived-ryensx-20260625.md  ← 历史归档
+PRD.v0.2-archived-20260625.md       # 旧 PRD 归档
+docs/architecture/v0.2-archived-20260625.md
+docs/data-model/v0.2-archived-20260625.md
 AGENTS.md                           # 本文件
 ```
 
@@ -174,12 +183,15 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
 ## AI 行为准则
 
 ### 接到 Codex Box 任务时
-1. 先 Read `PRD.md` 理解产品
-2. 再 Read `docs/architecture/v0.2.md` 理解整体架构、页面结构和数据流
+1. 先 Read `PRD.md` 理解产品（v0.3 BYOK 主线）
+2. 再 Read `docs/architecture/v0.3-BYOK.md` 理解整体架构、页面结构和数据流
 3. 再 Read `docs/design/v0.1.md` 理解 UI 规范
-4. 再 Read `docs/data-model/v0.2.md` 理解数据模型
-5. 再读 `docs/decisions/` 最近的 ADR 理解决策历史
-6. 最后再动手
+4. 再 Read `docs/data-model/v0.3-BYOK.md` 理解数据模型
+5. 再读 `docs/decisions/0005-BYOK-模型下拉与多-provider-路由.md` 理解决策历史
+6. 参考 `docs/references/aitabby-opencodex.md` 了解参考项目事实
+7. 最后再动手
+
+> ⚠️ 不要按 `PRD.v0.2-archived-20260625.md` / `docs/architecture/v0.2-archived-20260625.md` / `docs/data-model/v0.2-archived-20260625.md` / `docs/decisions/0004-OpenCodex-能力复现策略.superseded-20260625.md` / `docs/references/opencodex-technical-notes.archived-ryensx-20260625.md` 继续执行 — 这些都是 superseded 归档。
 
 ### 写代码前
 - 列出要改的文件
@@ -208,25 +220,28 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
 - **M0**：技术验证 — Tauri 读取/写入 TOML、备份、diff、atomic write
 - **M1**：只读 Dashboard
 - **M2**：Provider / Profile MVP，写入闭环，共存迁移
-- **M2.5**：OpenCodex 能力复现底座 — gateway / auth / runtime locator / log / health
-- **M3**：Gateway / Mobile Access / Codex Runtime 页面接真实 runtime
+- **M2.5**：**BYOK 模型目录与多 provider 路由底座**（替代旧定义"OpenCodex 能力复现底座"）— `~/.opencodex/*.json` 读写、provider 路由、Codex Desktop 只读检测
+- **M3**：Models / Provider Routes / Codex Runtime 页面接真实配置
 - **M4**：Diagnostics / Settings 接通真实检查与配置
 - **M5**：桌面体验打磨 — system tray、备份时间线、导入导出
 
-详见 [PRD.md §9](./PRD.md)。
+详见 [PRD.md §9](./PRD.md) 与 [ADR-0005](./docs/decisions/0005-BYOK-模型下拉与多-provider-路由.md)。
 
 ---
 
 ## 联系方式 / 上游文档
 
-- 原始 PRD：见 [PRD.md](./PRD.md)
-- 架构方案：见 [docs/architecture/v0.2.md](./docs/architecture/v0.2.md)
-- UI 设计稿：`docs/design/v0.1.md` 含线框图
-- 数据模型：[docs/data-model/v0.2.md](./docs/data-model/v0.2.md)
+- 当前 PRD：见 [PRD.md](./PRD.md)（v0.3 BYOK 主线）
+- 架构方案：见 [docs/architecture/v0.3-BYOK.md](./docs/architecture/v0.3-BYOK.md)
+- UI 设计稿：`docs/design/v0.1.md` 含线框图（视觉规范有效，导航项以 v0.3 为准）
+- 数据模型：[docs/data-model/v0.3-BYOK.md](./docs/data-model/v0.3-BYOK.md)
 - 决策日志：`docs/decisions/`
+- 参考项目：[docs/references/aitabby-opencodex.md](./docs/references/aitabby-opencodex.md)
+- 历史归档：`PRD.v0.2-archived-20260625.md` / `docs/architecture/v0.2-archived-20260625.md` / `docs/data-model/v0.2-archived-20260625.md` / `docs/decisions/0004-OpenCodex-能力复现策略.superseded-20260625.md` / `docs/references/opencodex-technical-notes.archived-ryensx-20260625.md`
 
 ---
 
 ## 版本
 
-- v0.2 · 2026-06-25 · OpenCodex 能力复现路线收敛
+- v0.3 · 2026-06-25 · BYOK 模型下拉与多 provider 路由主线收敛
+- v0.2 已归档为 `PRD.v0.2-archived-20260625.md` / `docs/architecture/v0.2-archived-20260625.md` / `docs/data-model/v0.2-archived-20260625.md`
