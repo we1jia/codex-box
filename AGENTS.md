@@ -1,7 +1,7 @@
 # AGENTS.md · Codex Box
 
 > 给所有 AI 代理（Claude / Codex / 其他）的工作规范
-> 最后更新：2026-06-24
+> 最后更新：2026-06-25
 
 ---
 
@@ -23,11 +23,12 @@
 ## 项目边界
 
 ### 这是什么
-Codex Box 是面向 OpenAI Codex 的**本地配置与网关管理器**。
+Codex Box 是面向 OpenAI Codex 的**本地桌面控制台、配置管理器与 OpenCodex 能力复现层**。
 
 - 技术栈：`Tauri + React + TypeScript + Tailwind + shadcn/ui + Rust`
 - 数据源：`~/.codex/config.toml`（主）、`~/.codex/codex-box/`（自有）
 - 风格：现代 Mac Dashboard + frosted glass
+- 主线：复现 OpenCodex 的 gateway / mobile access / runtime 管理核心能力，但保持独立代码路径和自有 UI
 
 ### 绝对不做（红线）
 - ❌ 抓取任何账号 token
@@ -53,9 +54,11 @@ Codex Box 是面向 OpenAI Codex 的**本地配置与网关管理器**。
 ### 文档位置
 ```
 PRD.md                              # 产品需求
+docs/architecture/v0.2.md           # 整体架构、页面结构、数据流
 docs/design/v0.1.md                 # UI 设计规范 + 线框图
-docs/data-model/v0.1.md             # 数据模型
+docs/data-model/v0.2.md             # 数据模型
 docs/decisions/                     # 关键决策日志（ADR）
+docs/references/                    # 第三方项目技术事实与参考资料
 AGENTS.md                           # 本文件
 ```
 
@@ -109,11 +112,11 @@ codex-box/
 │  ├─ components/              # 通用组件
 │  ├─ pages/                   # 路由页面
 │  │  ├─ Dashboard.tsx
+│  │  ├─ Gateway.tsx
+│  │  ├─ MobileAccess.tsx
+│  │  ├─ CodexRuntime.tsx
 │  │  ├─ Profiles.tsx
 │  │  ├─ Providers.tsx
-│  │  ├─ Network.tsx
-│  │  ├─ McpServers.tsx
-│  │  ├─ ConfigDiff.tsx
 │  │  ├─ Diagnostics.tsx
 │  │  └─ Settings.tsx
 │  ├─ store/                   # zustand stores
@@ -172,10 +175,11 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
 
 ### 接到 Codex Box 任务时
 1. 先 Read `PRD.md` 理解产品
-2. 再 Read `docs/design/v0.1.md` 理解 UI 规范
-3. 再 Read `docs/data-model/v0.1.md` 理解数据模型
-4. 再读 `docs/decisions/` 最近的 ADR 理解决策历史
-5. 最后再动手
+2. 再 Read `docs/architecture/v0.2.md` 理解整体架构、页面结构和数据流
+3. 再 Read `docs/design/v0.1.md` 理解 UI 规范
+4. 再 Read `docs/data-model/v0.2.md` 理解数据模型
+5. 再读 `docs/decisions/` 最近的 ADR 理解决策历史
+6. 最后再动手
 
 ### 写代码前
 - 列出要改的文件
@@ -203,25 +207,26 @@ Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
 
 - **M0**：技术验证 — Tauri 读取/写入 TOML、备份、diff、atomic write
 - **M1**：只读 Dashboard
-- **M2**：Profile + Provider MVP
-- **M3**：Network + Diagnostics
-- **M4**：MCP Manager
-- **M5**：Gateway 体验增强
-- **M6**：桌面体验打磨
+- **M2**：Provider / Profile MVP，写入闭环，共存迁移
+- **M2.5**：OpenCodex 能力复现底座 — gateway / auth / runtime locator / log / health
+- **M3**：Gateway / Mobile Access / Codex Runtime 页面接真实 runtime
+- **M4**：Diagnostics / Settings 接通真实检查与配置
+- **M5**：桌面体验打磨 — system tray、备份时间线、导入导出
 
-详见 [PRD.md §11](./PRD.md)。
+详见 [PRD.md §9](./PRD.md)。
 
 ---
 
 ## 联系方式 / 上游文档
 
 - 原始 PRD：见 [PRD.md](./PRD.md)
+- 架构方案：见 [docs/architecture/v0.2.md](./docs/architecture/v0.2.md)
 - UI 设计稿：`docs/design/v0.1.md` 含线框图
-- 数据模型：[docs/data-model/v0.1.md](./data-model/v0.1.md)
+- 数据模型：[docs/data-model/v0.2.md](./docs/data-model/v0.2.md)
 - 决策日志：`docs/decisions/`
 
 ---
 
 ## 版本
 
-- v0.1 · 2026-06-24 · 初始化
+- v0.2 · 2026-06-25 · OpenCodex 能力复现路线收敛

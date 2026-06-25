@@ -1,211 +1,237 @@
-# Codex Box · PRD v0.1
+# Codex Box · PRD v0.2
 
-> 围绕 OpenAI Codex 的本地配置与网关管理器
-> 状态：v0.1 草案 · 2026-06-24
+> 围绕 Codex Desktop / Codex CLI 的本地控制台、配置管理器与 OpenCodex 能力复现层
+> 状态：v0.2 基线 · 2026-06-25
 
 ---
 
 ## 1. 产品定位
 
-**Codex Box** 是一个面向 OpenAI Codex 用户的本地配置与网关管理器。
+**Codex Box** 是一个面向 OpenAI Codex 用户的本地桌面控制台。
 
-核心价值：让用户更安全、更直观地管理 Codex 的配置、profile、provider、MCP server、network route 和诊断信息。
+它要做三件事：
 
-**它不是**：
-- ❌ 账号切换器
-- ❌ Token 抓取工具
-- ❌ 登录绕过、rate limit 规避、账号限制绕过工具
-- ❌ Codex Desktop 内部改造工具
+1. **复现 OpenCodex 的核心使用价值**：让手机、平板、另一台电脑可以通过浏览器访问目标机器上的 Codex 工作流。
+2. **保留 Codex Box 自有体验**：使用 Tauri + React 做原生桌面控制台，采用 Mac Dashboard + frosted glass 视觉，不复制 OpenCodex 的 Web shell UI。
+3. **提供安全配置管理**：可视化管理 `~/.codex/config.toml`、profile、provider、gateway、诊断、备份和 diff。
+
+一句话：
+
+> Codex Box = OpenCodex 核心能力复现 + 桌面端控制台 + Codex 配置安全管理。
 
 ---
 
 ## 2. 目标用户
 
 - 高频使用 `Codex CLI` / `Codex Desktop` 的开发者
-- 需要在多个 provider、profile、proxy、MCP server 之间切换的用户
+- 想在手机、平板或另一台电脑上访问本机 Codex 的用户
+- 需要在官方订阅、OpenAI API、OpenAI-compatible API、本地 gateway 间切换的用户
 - 需要安全修改 `~/.codex/config.toml` 的用户
-- 需要快速诊断 Codex 网络、provider、MCP、auth 状态的用户
+- 需要诊断 Codex Desktop、Codex CLI、gateway、provider、MCP、network 状态的用户
 
 ---
 
 ## 3. MVP 目标
 
-P0 版本要解决三个核心问题：
+v0.2 的 MVP 不再只是配置管理器，而是要跑通四条主路径：
 
-1. **看得清**：把 `~/.codex/config.toml` 结构化展示出来
-2. **改得稳**：所有配置修改支持 backup、diff、atomic write、rollback
-3. **查得快**：能对 provider、network、MCP、auth 做基础健康检查
+1. **看得清**：Dashboard 结构化展示 Codex config、profile、provider、gateway、runtime 状态。
+2. **改得稳**：所有 `~/.codex/config.toml` 写入必须 backup、diff、confirm、atomic write、rollback。
+3. **连得上**：内置 gateway runtime 支持本机访问、LAN 访问、访问密码、health check、日志。
+4. **查得快**：Diagnostics 能检查 config、runtime、port、auth、provider、MCP、network。
 
 ---
 
 ## 4. P0 功能范围
 
-### Dashboard
-- 展示当前 active profile、provider、network route、MCP servers、auth 状态
-- 最近备份、健康检查摘要
-- 启动设置引导（3 步骤：设置 Profile / 连接 Provider / 配置 MCP Server）
+### Overview
 
-### Config 管理
-- 读取、解析、展示 `~/.codex/config.toml`
-- 修改前自动 backup
-- atomic write 写回
-- config diff 预览
-- 回滚到历史备份
+- 当前 active profile、provider、model、network、MCP 摘要
+- Gateway 运行状态、本机 URL、LAN URL、health 状态
+- Codex Runtime 状态：Codex Desktop / Codex CLI / `CODEX_HOME`
+- 最近错误、最近备份、快速入口
+
+### Gateway
+
+- 管理内置 gateway runtime 的启动、停止、重启
+- 管理 host、port、local URL、LAN URL、runtime dir、log path
+- 默认只监听 `127.0.0.1`
+- LAN 模式必须先配置访问密码
+- health endpoint、端口占用检测、日志查看
+- 现阶段可以临时托管外部 OpenCodex checkout，但目标是移除硬编码外部依赖，收敛为 Codex Box 自有 runtime 模块
+
+### Mobile Access
+
+- 展示手机访问 URL、LAN IP、二维码
+- 明确区分“候选 LAN 地址”和“已启用移动访问”
+- 启用条件：gateway running + LAN host + password configured
+- 安全提示：默认本机访问，不自动暴露局域网
+
+### Codex Runtime
+
+- 检测 Codex Desktop 是否安装
+- 检测 Codex CLI 是否存在
+- 检测 `CODEX_HOME` 是否可读
+- 只读扫描官方资源；不默认解包、patch 或修改 Codex Desktop 内部文件
+- 记录 runtime path、cache path、共享状态
 
 ### Profiles
+
 - 展示 profile config
 - 新建、编辑、删除 profile
 - 设置 active / default profile
-- 校验 profile 引用的 provider、sandbox、approval、env
+- profile 是模型切换入口，绑定 `model + model_provider + sandbox + approval + network + mcp_refs`
+- 首次新增第三方 provider 时，必须保留官方订阅 profile，避免把官方订阅入口覆盖掉
 
 ### Providers
+
 - 管理 `model_provider / model_providers`
-- 支持 OpenAI official API、OpenAI-compatible API、本地 gateway
-- 官方订阅通道仅做状态识别与配置边界展示，不抓取、不复用、不转发 Codex / OpenAI 账号 token
-- provider URL、model、env secret 引用管理
-- secret 不明文展示
+- 支持：
+  - OpenAI subscription（只做状态识别，不复用 token）
+  - OpenAI official API
+  - OpenAI-compatible API
+  - local gateway
+  - codex-proxy / CLIProxyAPI 预设
+- 第三方 API 必须显式使用 `base_url + env secret` 引用
+- secret 不明文展示、不写日志、不导出
 
-### Gateway / Adapter 底座
-- 在 M2 先完成 provider、profile、protocol adapter 的配置建模
-- 模型选择器切换完整 profile，而不是只切换裸 `model` 字段
-- 第三方 API 统一走显式 `base_url + env secret` 引用
-- 不同上游的 Chat Completions、Responses API、SSE stream、tool calls、reasoning、usage、error 结构在 adapter 层统一
-- Open Codex、codex-proxy、CLIProxyAPI 等参考项目只作为 provider / gateway preset 接入，不与官方订阅认证混用
+### Config 管理
 
-### MCP Servers
-- 展示 MCP server 配置
-- 新建、编辑、禁用、删除
-- 检测 command / path / env 是否可用
-- 日志与错误信息脱敏
-
-### Network
-- direct
-- HTTP proxy
-- SOCKS proxy
-- Clash / Mihomo profile 引用
-- 连通性测试
-- **不**默认接管系统全局代理
+- 读取、解析、展示 `~/.codex/config.toml`
+- 写入前生成结构化 diff 和文本 diff
+- 写入前自动 backup
+- atomic write 写回
+- 写入失败 rollback 到最近一次 backup
+- 回滚到历史备份
 
 ### Diagnostics
-- Codex config 语法检查
-- provider endpoint 测试
-- auth 状态检测
-- MCP server 可执行性检测
-- proxy 连通性检测
+
+- Config 语法检查
+- Codex Desktop 安装检测
+- Codex CLI / `CODEX_HOME` 检测
+- Gateway port / health / auth 检测
+- Provider endpoint 检测
+- MCP server command / path / env 检测
+- Network direct / proxy 连通性检测
 - 输出可复制的脱敏诊断报告
 
----
+### Settings
 
-## 5. P1 功能范围
-
-- Provider presets
-- CLIProxyAPI / codex-proxy / local gateway 启动、停止、日志管理
-- 项目目录绑定 profile
-- system tray
-- 配置历史时间线
-- 配置导入导出
+- 语言、主题、启动行为
+- gateway 默认 host、port、LAN 访问策略
+- 访问密码配置
+- 日志大小和保留策略
+- 备份保留策略
+- 实验功能开关
 
 ---
 
-## 6. 暂缓范围（P2）
+## 5. 暂缓范围
 
-- 多账号额度监控
-- 自动登录 / OAuth 接管 / token 抓取
-- 修改 Codex Desktop 内部 UI
-- 深度控制 Clash / Mihomo 全局规则
-- 团队同步 SaaS
-- 自研完整 gateway
+- 抓取、复用或转发官方账号 token
+- 自动登录 / OAuth 接管 / 登录绕过
+- 规避 rate limit / 账号配额限制
+- 默认修改 Codex Desktop 内部文件
+- 默认解包官方 `app.asar`
+- 接管系统全局代理
+- 团队同步 SaaS / 上传用户配置
+- 无沙箱第三方插件系统
 
 ---
 
-## 7. 核心页面
+## 6. 核心页面
 
 | 页面 | 说明 |
 |---|---|
-| `Dashboard` | 总览 + 启动引导 + 健康检查 |
-| `Profiles` | profile 管理 |
-| `Providers` | model provider 管理 |
-| `Network` | network route 管理 |
-| `MCP Servers` | MCP server 管理 |
-| `Config Diff` | 配置 diff 与回滚 |
+| `Overview` | 总览、当前状态、快速入口 |
+| `Gateway` | 内置 gateway runtime 启停、端口、日志、health |
+| `Mobile Access` | 手机访问 URL、LAN 状态、二维码、安全提示 |
+| `Codex Runtime` | Codex Desktop / CLI / CODEX_HOME 检测 |
+| `Profiles` | 工作配置管理 |
+| `Providers` | 模型来源管理 |
 | `Diagnostics` | 诊断与脱敏报告 |
 | `Settings` | 应用设置 |
 
+`MCP / Network / Config Diff` 暂时作为相关页面中的能力区块，不单独放入主导航；功能稳定后再拆。
+
 ---
 
-## 8. 关键数据模型
+## 7. 关键数据模型
 
 - `CodexConfigSnapshot`
 - `CodexProfile`
 - `ModelProvider`
+- `GatewayRuntime`
+- `GatewayAccess`
+- `CodexRuntimeStatus`
 - `NetworkRoute`
 - `McpServer`
 - `BackupRecord`
 - `HealthStatus`
 - `SecretRef`
+- `ConfigChangePreview`
 
-详细字段定义见 [data-model/v0.1.md](./data-model/v0.1.md)。
+详细字段定义见 [docs/data-model/v0.2.md](./docs/data-model/v0.2.md)。
 
 ---
 
-## 9. 技术方向
+## 8. 技术方向
 
 - Desktop：`Tauri`
 - Frontend：`React + TypeScript`
 - UI：`Tailwind CSS + shadcn/ui`
 - Backend：`Rust`
-- Config：`TOML parser`（`toml` crate）
+- Config：`toml` crate + 后续按写入需求引入保格式能力
 - Diff：结构化 diff + 文本 diff
-- 写入策略：backup first + atomic write（写临时文件 → rename）
+- Gateway：Codex Box 自有 runtime 模块，吸收 OpenCodex 的功能事实，不复制其 UI 和长段实现
+- State：`zustand` + `@tanstack/react-query`
+- 写入策略：backup first + diff confirm + atomic write + rollback
 
 ---
 
-## 10. 安全原则
+## 9. 里程碑
 
-- ✅ 写入前必须 backup
-- ✅ 写入前展示 diff
-- ✅ 写入必须 atomic write
-- ✅ secret 不明文展示
-- ✅ 日志必须脱敏
-- ✅ 不默认接管系统代理
-- ✅ 不默认修改 Codex Desktop 内部文件
-- ❌ 不做 token 抓取或登录绕过
-
----
-
-## 11. 里程碑
-
-| 里程碑 | 范围 |
-|---|---|
-| M0 | 技术验证：Tauri 读取/写入 TOML、备份、diff、atomic write |
-| M1 | 只读 Dashboard |
-| M2 | Profile + Provider MVP（含 gateway / adapter 配置底座） |
-| M3 | Network + Diagnostics |
-| M4 | MCP Manager |
-| M5 | Gateway 体验增强（CLIProxyAPI / codex-proxy 启停、日志、preset） |
-| M6 | 桌面体验打磨（system tray / 导入导出） |
+| 里程碑 | 范围 | 状态 |
+|---|---|---|
+| M0 | Tauri 读取/写入 TOML、backup、diff、atomic write | 已完成 |
+| M1 | 只读 Dashboard / Overview | 已完成 |
+| M2 | Provider / Profile MVP，写入闭环，共存迁移 | 部分完成 |
+| M2.5 | OpenCodex 能力复现底座：gateway / auth / runtime locator / log / health | 进行中 |
+| M3 | Gateway / Mobile Access / Codex Runtime 页面接真实 runtime | 待开始 |
+| M4 | Diagnostics / Settings 接通真实检查与配置 | 待开始 |
+| M5 | 桌面体验打磨：system tray、备份时间线、导入导出 | 待开始 |
 
 ---
 
-## 12. 风险边界
-
-> 这部分为**红线**，开发时必须遵守。
+## 10. 风险边界
 
 ### 绝对不做
+
 - 不抓取任何账号 token
 - 不绕过 OpenAI 官方登录
 - 不规避 rate limit / 账号配额限制
 - 不默认修改 Codex Desktop 内部文件
 - 不接管系统全局代理
-- 不做团队同步 SaaS
+- 不上传任何用户配置
+- 不复制 OpenCodex 的 UI、长段文案或源码实现
+
+### OpenCodex 兼容边界
+
+- OpenCodex 是 AGPL-3.0 项目；Codex Box 只吸收公开功能事实、运行方式、配置字段、health 行为和安全边界。
+- 如直接复制或派生 OpenCodex 代码，必须先单独评估许可证义务并在 ADR 中确认。
+- Codex Box 的实现应保持独立代码路径。
 
 ### 写入红线
+
 - 任何 `~/.codex/config.toml` 写入必须先 backup
-- 任何写入必须 atomic write（写 `.tmp` → rename）
-- 写入前必须展示 diff
-- 写入失败必须能 rollback 到最近一次 backup
+- 写入前必须展示 diff 并由用户确认
+- 写入必须 atomic write（写 `.tmp` → `rename`）
+- 写入失败必须 rollback 到最近一次 backup
+- 并发写入必须校验 `content_hash`
 
 ### 隐私红线
-- secret 字段（API key、token）**永远不写日志**
-- 日志默认脱敏（key 显示为 `sk-proj-***`）
+
+- secret 字段（API key、token、password）永远不写日志
+- UI 只展示 env key 名和脱敏显示
+- 诊断报告默认脱敏
 - 不上传任何用户配置到外部服务

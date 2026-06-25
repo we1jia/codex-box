@@ -4,6 +4,8 @@
 > 版本来源：`RyensX/OpenCodex` main 源码包
 > 拆解时间：2026-06-24
 
+版权边界：本文只记录本地集成所需的接口事实、启动方式和架构判断，不复制 OpenCodex 的源码、UI 实现或长段文案。Codex Box 的实现应保持独立代码路径，只通过公开运行方式、环境变量、健康检查和配置文件进行兼容。
+
 ---
 
 ## 1. 项目定位
@@ -17,10 +19,11 @@ OpenCodex 不是第三方模型 API 网关，而是 **Codex Desktop 的远程 We
 - 让手机、平板或另一台电脑通过浏览器访问目标机器上的 Codex
 - 提供访问密码、局域网访问、插件、移动端优化
 
-这和 Codex Box 的关系：
+这和 Codex Box v0.2 的关系：
 
-- 可参考：gateway 启停、状态、端口、日志、认证、插件、诊断、官方资源只读扫描
-- 不直接照搬：隐藏 Electron runtime、patch 官方 IPC、远程操作 Codex Desktop
+- 需要复现：gateway 启停、状态、端口、日志、认证、移动端访问、诊断、官方资源只读扫描
+- 必须保持独立实现：不复制 OpenCodex 源码、UI、长段文案
+- 必须守住边界：不抓 token、不绕过官方登录、不默认 patch 官方 IPC、不默认修改 Codex Desktop 内部文件
 
 ---
 
@@ -109,10 +112,11 @@ OpenCodex/
 - 日志字段应只保留 route、method、status、latency、requestId 摘要
 - `Diagnostics` 可分离 HTTP health、WS health、provider health
 
-不直接照搬：
+实现边界：
 
-- Codex Box 当前不做官方 IPC 转发
-- 不应为了模型切换去 patch 官方 renderer 或 IPC
+- 可以实现浏览器访问本机 Codex 工作流的能力
+- 不应为了模型切换去 patch 官方 renderer 或私有 IPC
+- 不应记录 prompt、文件正文、token、password
 
 ### 3.4 认证
 
@@ -193,36 +197,36 @@ OpenCodex/
    - provider 是模型来源
    - gateway 是高级 provider 类型
 
-### 不应该吸收
+### 不应该复制或默认启用
 
 1. 不默认 patch Codex Desktop IPC
 2. 不默认解包官方 `app.asar`
-3. 不做远程控制 Codex Desktop
+3. 不通过抓 token、patch 私有 IPC 或修改官方安装目录来实现移动访问
 4. 不抓取或复用官方账号 token
 5. 不把 OpenCodex 的浏览器 shell 作为 Codex Box 主界面
+6. 不直接引入无沙箱第三方插件系统
 
 ---
 
 ## 5. 建议落地顺序
 
-### M2
+### M2.5
 
-- Profiles / Providers 接真实 config 数据
-- Provider kind 增加 `local_gateway`
-- Gateway 页面先展示配置和状态骨架
+- 把当前外部 OpenCodex checkout 托管能力标记为过渡态
+- 设计 Codex Box 自有 `GatewayRuntime` / `GatewayAccess` / `CodexRuntimeStatus`
+- 移除硬编码个人路径，改为内置 runtime 或用户显式配置
 
 ### M3
 
-- Diagnostics 增加 Codex Desktop / Codex CLI / gateway port 检查
-- Network 增加 LAN / local 访问风险提示
-
-### M5
-
-- 实现本地 gateway 进程管理
-- 支持 OpenCodex / codex-proxy / CLIProxyAPI 作为 gateway preset
+- Gateway / Mobile Access / Codex Runtime 页面接真实 runtime
 - 增加日志查看、health endpoint、端口冲突检测
+- LAN 模式强制访问密码
 
-### M6+
+### M4
 
-- 再考虑插件系统或 adapter 扩展系统
+- Diagnostics 增加 Codex Desktop / Codex CLI / `CODEX_HOME` / gateway port 检查
+- Settings 接入 gateway 默认 host、port、日志保留、访问密码
 
+### M5+
+
+- 再考虑插件系统、adapter 扩展系统、system tray、导入导出
