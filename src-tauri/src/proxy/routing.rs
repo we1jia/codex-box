@@ -10,6 +10,7 @@
 //   1. 优先按命名空间形式解析
 //   2. 否则在 inject-map 里按唯一 model_id 匹配
 //   3. 都没命中返回 None,handler 返回 404
+use crate::commands::opencodex::{ModelCatalogEntry, ProviderRoute};
 use crate::proxy::inject_map::InjectMap;
 
 /// 解析后的路由
@@ -77,7 +78,16 @@ pub fn resolve_catalog_route(model_id: &str, map: &InjectMap) -> Option<Resolved
     }
 
     let cfg = crate::commands::opencodex::opencodex_config_read().ok()?;
-    let entry = cfg.catalog.iter().find(|entry| {
+    resolve_catalog_route_from_sources(requested, &cfg.catalog, &cfg.providers, map)
+}
+
+pub fn resolve_catalog_route_from_sources(
+    requested: &str,
+    catalog: &[ModelCatalogEntry],
+    providers: &[ProviderRoute],
+    map: &InjectMap,
+) -> Option<ResolvedRoute> {
+    let entry = catalog.iter().find(|entry| {
         entry.visible
             && (entry.model_id == requested
                 || format!("{}/{}", entry.provider, entry.model_id) == requested)
@@ -94,15 +104,42 @@ pub fn resolve_catalog_route(model_id: &str, map: &InjectMap) -> Option<Resolved
         .filter(|s| !s.is_empty())
         .unwrap_or(&entry.model_id);
 
-    let provider = map.providers.iter().find(|p| p.name == provider_name)?;
+    if let Some(provider) = map.providers.iter().find(|p| p.name == provider_name) {
+        return Some(ResolvedRoute {
+            provider_name: provider.name.clone(),
+            model_id: upstream_model.to_string(),
+            upstream_base_url: provider.original_base_url.clone(),
+            wire_api: provider.wire_api.clone(),
+            env_key: provider.env_key.clone(),
+            http_headers: provider.http_headers.clone(),
+        });
+    }
+
+    let provider = providers
+        .iter()
+        .find(|provider| provider.enabled && provider.name == provider_name)?;
     Some(ResolvedRoute {
         provider_name: provider.name.clone(),
         model_id: upstream_model.to_string(),
-        upstream_base_url: provider.original_base_url.clone(),
+        upstream_base_url: provider.base_url.clone(),
         wire_api: provider.wire_api.clone(),
-        env_key: provider.env_key.clone(),
+        env_key: provider.api_key_ref.as_deref().and_then(normalize_env_ref),
         http_headers: provider.http_headers.clone(),
     })
+}
+
+fn normalize_env_ref(value: &str) -> Option<String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    if let Some(inner) = trimmed.strip_prefix("${").and_then(|v| v.strip_suffix('}')) {
+        return Some(inner.to_string());
+    }
+    if let Some(inner) = trimmed.strip_prefix('$') {
+        return Some(inner.to_string());
+    }
+    Some(trimmed.to_string())
 }
 
 fn build_route(entry: &crate::proxy::inject_map::InjectMapEntry, model_id: &str) -> ResolvedRoute {
@@ -140,6 +177,42 @@ mod tests {
             updated_at: "2026-06-25T00:00:00Z".to_string(),
             port: 1455,
             providers,
+        }
+    }
+
+    fn catalog_entry(
+        model_id: &str,
+        provider: &str,
+        backend_provider: Option<&str>,
+        backend_model: Option<&str>,
+    ) -> ModelCatalogEntry {
+        ModelCatalogEntry {
+            model_id: model_id.to_string(),
+            display_name: None,
+            provider: provider.to_string(),
+            backend_model: backend_model.map(ToString::to_string),
+            backend_provider: backend_provider.map(ToString::to_string),
+            visible: true,
+            reasoning: None,
+            note: None,
+            vision_bridge_enabled: None,
+            vision_fallback_base_url: None,
+            vision_fallback_model: None,
+            vision_fallback_api_key_ref: None,
+            extra: BTreeMap::new(),
+        }
+    }
+
+    fn provider_route(name: &str, base_url: &str, api_key_ref: Option<&str>) -> ProviderRoute {
+        ProviderRoute {
+            name: name.to_string(),
+            base_url: base_url.to_string(),
+            wire_api: "chat".to_string(),
+            api_key_ref: api_key_ref.map(ToString::to_string),
+            http_headers: BTreeMap::new(),
+            enabled: true,
+            note: None,
+            extra: BTreeMap::new(),
         }
     }
 
@@ -192,5 +265,28 @@ mod tests {
         let r = resolve_route("llama3", &map).unwrap();
         assert_eq!(r.provider_name, "local");
         assert_eq!(r.model_id, "llama3");
+    }
+
+    #[test]
+    fn catalog_backend_provider_resolves_from_opencodex_providers_when_not_in_inject_map() {
+        let map = map_with(vec![]);
+        let catalog = vec![catalog_entry(
+            "minimax",
+            "opencodex",
+            Some("minimax"),
+            Some("MiniMax-M1"),
+        )];
+        let providers = vec![provider_route(
+            "minimax",
+            "https://api.minimaxi.com/v1",
+            Some("${MINIMAX_API_KEY}"),
+        )];
+
+        let r = resolve_catalog_route_from_sources("minimax", &catalog, &providers, &map).unwrap();
+
+        assert_eq!(r.provider_name, "minimax");
+        assert_eq!(r.model_id, "MiniMax-M1");
+        assert_eq!(r.upstream_base_url, "https://api.minimaxi.com/v1");
+        assert_eq!(r.env_key.as_deref(), Some("MINIMAX_API_KEY"));
     }
 }

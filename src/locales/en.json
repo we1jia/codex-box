@@ -1,7 +1,7 @@
 {
   "nav": {
     "dashboard": "Overview",
-    "models": "Models",
+    "models": "Model Config",
     "provider_routes": "Provider Routes",
     "codex_runtime": "Codex Runtime",
     "profiles": "Profiles",
@@ -84,7 +84,9 @@
     "restartLan": "Restart LAN",
     "confirmWrite": "Confirm Write",
     "hide": "Hide",
-    "show": "Show"
+    "show": "Show",
+    "showDetails": "Details",
+    "hideDetails": "Hide details"
   },
   "summary": {
     "totalProfiles": "Profiles",
@@ -132,6 +134,7 @@
     "healthEndpoint": "Health endpoint",
     "baseUrl": "base_url",
     "running": "Running",
+    "provider": "Provider",
     "catalogPath": "Catalog path",
     "contentHash": "Content hash",
     "displayName": "Display name",
@@ -148,7 +151,8 @@
     "desktopInstalled": "Desktop installed",
     "cliAvailable": "CLI available",
     "opencodexDir": "~/.opencodex dir",
-    "note": "Note"
+    "note": "Note",
+    "absolutePath": "Absolute path"
   },
   "providerKind": {
     "subscription": "Official subscription",
@@ -186,13 +190,35 @@
       "networkSubsection": "Network route attached to this provider"
     },
     "models": {
-      "title": "Models",
-      "subtitle": "BYOK catalog: aggregates all entries from ~/.opencodex/custom_model_catalog.json and decides which models show up in the Codex App picker.",
+      "title": "Model Config",
+      "subtitle": "OpenCodex-style setup: enter model name, endpoint URL, and API key, then choose which models appear in the Codex picker.",
+      "simpleConfigTitle": "Add Model Config",
+      "dropdownTitle": "Codex Picker Models",
       "catalogSourceTitle": "Catalog Source",
       "listTitle": "Model Catalog",
       "detailTitle": "Model Detail",
+      "advancedTitle": "Advanced Features",
+      "visionTitle": "Vision Fallback",
+      "visionHint": "Enable Vision Bridge for text-only models: screenshots are described by a vision model before being sent to the selected model.",
+      "visionEnable": "Enable vision fallback for this model",
+      "visionModel": "Vision model",
+      "visionEnvKey": "Vision API env key",
+      "visionSave": "Save vision fallback",
+      "visibleInDropdown": "Shown in picker",
+      "hiddenInDropdown": "Hidden",
+      "form": {
+        "modelName": "Model name",
+        "modelNamePlaceholder": "Example: deepseek:deepseek-chat or gpt-5.5-custom=gpt-5.5",
+        "aliasHint": "Supports provider:model, display=backend, and display->backend formats.",
+        "baseUrl": "Endpoint URL",
+        "apiKey": "API Key",
+        "secretHint": "You may paste a key here. Codex Box writes only an environment-variable reference, never the raw key, into config files.",
+        "restartCodex": "Remind me to restart Codex Desktop after saving",
+        "restartAfterUpdate": "Remind me to restart Codex Desktop after updating",
+        "saveAndAdd": "Save and add model"
+      },
       "byokHint": "About switching models",
-      "byokHintBody": "Switching is a whole CodexProfile, not a bare model field. Codex Box writes ~/.codex/config.toml through the existing backup → diff → confirm → atomic write loop, and writes ~/.opencodex/custom_model_catalog.json through the same loop. Unknown fields are preserved to stay compatible with the AITabby/opencodex CLI."
+      "byokHintBody": "Most users only need two steps on this page: add a model config, then choose whether it appears in the Codex picker. Advanced provider routes, runtime injection, and diagnostics remain available from the sidebar."
     },
     "providerRoutes": {
       "title": "Provider Routes",
@@ -229,6 +255,17 @@
       "preview": "Preview",
       "previewHint": "Start the proxy first, then click Preview to fetch the merged model list.",
       "previewUrl": "Preview URL",
+      "conversationProvider": {
+        "title": "Conversation Provider",
+        "hint": "This edits the model_provider name Codex App uses to group conversation history. Actual requests still go to the 127.0.0.1 local proxy; backend_provider in the model catalog decides the real upstream.",
+        "history": "Historical Provider",
+        "preview": "Preview diff",
+        "originalBaseUrl": "Historical base_url",
+        "requiresOpenaiAuth": "Keep requires_openai_auth=true for Codex Desktop OpenAI login compatibility.",
+        "proxyBaseUrl": "Actual request URL",
+        "source": "Source file",
+        "confirm": "Apply switch"
+      },
       "injectPanel": "Inject base_urls → proxy",
       "injectPreview": "Show diff",
       "injectHint": "Rewrites every non-subscription [model_providers.*].base_url to http://127.0.0.1:{port}/v1 and records the originals in ~/.codex/codex-box/inject-map.json. Codex App will route ALL third-party traffic through this proxy.",
@@ -241,6 +278,12 @@
       "routeTable": "Route table (inject-map)",
       "routeTableCount": "{{count}} providers",
       "routeTableEmpty": "No providers injected yet. Click Inject base_urls to enable routing.",
+      "logsPanel": "Runtime Logs",
+      "refreshLogs": "Refresh Logs",
+      "logsHint": "Logs belong to runtime, not model config. This panel only shows redacted local runtime events.",
+      "sessionsPanel": "Session Management",
+      "refreshSessions": "Refresh Sessions",
+      "sessionsHint": "Sessions are separate from model config: models define available capability, sessions track runtime context.",
       "lastError": "Last error",
       "safetyTitle": "Safety contract",
       "safetyBody": "Proxy only listens on 127.0.0.1 (never LAN). API keys are read from env vars at request time and never written to disk or logs. Every Inject/Restore goes through backup → diff → confirm → atomic write → rollback.",
@@ -256,7 +299,23 @@
         "restarted": "Proxy restarted on port {{port}}",
         "previewOk": "/v1/models fetched",
         "injectOk": "base_urls injected, restart Codex App to pick up new models",
-        "restoreOk": "base_urls restored"
+        "restoreOk": "base_urls restored",
+        "logsReady": "Runtime logs refreshed.",
+        "sessionsReady": "Session list refreshed."
+      },
+      "logs": {
+        "empty": "No runtime logs yet",
+        "items": {
+          "started": "[runtime] Local proxy status loaded",
+          "models": "[models] Merged model list prepared",
+          "redacted": "[security] Secret redaction is enabled"
+        }
+      },
+      "sessions": {
+        "active": "Active session",
+        "idle": "Ready",
+        "meta": "{{providers}} providers / {{models}} models",
+        "empty": "No sessions yet"
       },
       "col": {
         "name": "Provider",
@@ -265,6 +324,18 @@
         "envKey": "Env key",
         "kind": "Kind",
         "models": "Models"
+      },
+      "effectiveRouting": {
+        "title": "Effective routing chain",
+        "hint": "Shows the path Codex App will actually use: model_provider → base_url/openai_base_url → model_catalog_json → backend_provider → upstream API.",
+        "requestBaseUrl": "Request entry",
+        "requestSource": "Entry source",
+        "catalogProvider": "Catalog provider",
+        "upstream": "Real upstream",
+        "proxy": "Local proxy",
+        "issues": "Routing checks",
+        "noIssues": "No routing issues detected.",
+        "empty": "Effective routing has not been loaded yet."
       }
     },
     "diagnostics": {
@@ -336,21 +407,66 @@
       "byok": "BYOK write master switch, schema preservation, and visibility sync"
     },
     "options": {
-      "language": { "label": "Language", "desc": "Follow the current interface language and switch anytime." },
-      "theme": { "label": "Theme", "desc": "Keep the light Mac Dashboard direction. Dark mode will be added later." },
-      "startupCheck": { "label": "Startup check", "desc": "Read config and refresh the Dashboard summary on launch." },
-      "requireDiff": { "label": "Require diff before write", "desc": "Every save action must go through Config Diff first." },
-      "maskSecrets": { "label": "Mask secrets", "desc": "API keys, tokens, and passwords never appear in UI or logs." },
-      "confirmDanger": { "label": "Confirm dangerous actions", "desc": "Delete, rollback, and overwrite actions require confirmation." },
-      "backupFirst": { "label": "Backup before write", "desc": "Create a backup record before changing config." },
-      "retention": { "label": "Backup retention", "desc": "Keep up to 50 backups by default; settings will be editable later." },
-      "rollback": { "label": "Protected rollback", "desc": "Rollback also backs up the current state first." },
-      "redaction": { "label": "Log redaction", "desc": "Diagnostics keep route, status, and latency summaries only." },
-      "maxSize": { "label": "Log size limit", "desc": "Rotate logs when they reach the configured limit." },
-      "exportReport": { "label": "Export diagnostic report", "desc": "Reports are redacted by default and safe to copy." },
-      "byokWriteEnabled": { "label": "BYOK write master switch", "desc": "When off, Models and Provider Routes pages are read-only and no writes hit ~/.opencodex/." },
-      "byokSchemaPreserve": { "label": "BYOK schema preservation", "desc": "Preserve unknown fields when reading/writing ~/.opencodex/*.json, so AITabby CLI stays compatible." },
-      "byokVisibilitySync": { "label": "Visibility sync", "desc": "When toggling visibility on the Models page, sync the change into custom_model_catalog.json." }
+      "language": {
+        "label": "Language",
+        "desc": "Follow the current interface language and switch anytime."
+      },
+      "theme": {
+        "label": "Theme",
+        "desc": "Keep the light Mac Dashboard direction. Dark mode will be added later."
+      },
+      "startupCheck": {
+        "label": "Startup check",
+        "desc": "Read config and refresh the Dashboard summary on launch."
+      },
+      "requireDiff": {
+        "label": "Require diff before write",
+        "desc": "Every save action must go through Config Diff first."
+      },
+      "maskSecrets": {
+        "label": "Mask secrets",
+        "desc": "API keys, tokens, and passwords never appear in UI or logs."
+      },
+      "confirmDanger": {
+        "label": "Confirm dangerous actions",
+        "desc": "Delete, rollback, and overwrite actions require confirmation."
+      },
+      "backupFirst": {
+        "label": "Backup before write",
+        "desc": "Create a backup record before changing config."
+      },
+      "retention": {
+        "label": "Backup retention",
+        "desc": "Keep up to 50 backups by default; settings will be editable later."
+      },
+      "rollback": {
+        "label": "Protected rollback",
+        "desc": "Rollback also backs up the current state first."
+      },
+      "redaction": {
+        "label": "Log redaction",
+        "desc": "Diagnostics keep route, status, and latency summaries only."
+      },
+      "maxSize": {
+        "label": "Log size limit",
+        "desc": "Rotate logs when they reach the configured limit."
+      },
+      "exportReport": {
+        "label": "Export diagnostic report",
+        "desc": "Reports are redacted by default and safe to copy."
+      },
+      "byokWriteEnabled": {
+        "label": "BYOK write master switch",
+        "desc": "When off, Models and Provider Routes pages are read-only and no writes hit ~/.opencodex/."
+      },
+      "byokSchemaPreserve": {
+        "label": "BYOK schema preservation",
+        "desc": "Preserve unknown fields when reading/writing ~/.opencodex/*.json, so AITabby CLI stays compatible."
+      },
+      "byokVisibilitySync": {
+        "label": "Visibility sync",
+        "desc": "When toggling visibility on the Models page, sync the change into custom_model_catalog.json."
+      }
     }
   },
   "feedback": {
@@ -368,10 +484,17 @@
     "connectionTested": "{{name}} connection test completed (mock).",
     "providerCopied": "Copied provider config for {{name}}.",
     "previewDiff": "Config Diff preview is ready.",
+    "simpleModelFormInvalid": "Enter model name, endpoint URL, and API key.",
+    "simpleModelSaved": "{{name}} was saved and added to the Codex picker model list.",
+    "visionFallbackSaved": "Vision fallback config saved.",
     "modelVisibilityToggled": "Visibility updated for {{name}}.",
     "providerRouteToggled": "Provider route {{name}} enable state switched.",
     "providerRouteDeleted": "Provider route {{name}} deleted.",
-    "opencodexParseErrors": "BYOK directory files failed to parse; writes are blocked:",
+    "providerKeyNeedsFix": "API key needs fixing",
+    "conversationProviderInvalid": "Provider ID is required.",
+    "conversationProviderSaved": "Conversation Provider switched to {{name}}. Restart Codex App to apply it.",
+    "opencodexParseErrors": "Action needed: one or more model providers saved an API key directly in the config file. Codex Box is not using those keys, but it still shows data that can be read safely. Change api_key to ${ENV_VAR} and keep the real key in your system environment:",
+    "modelsEmpty": "The model catalog is empty. A Provider is only an API source; add model entries before Codex App can show models in its picker.",
     "gatewayPreset": "Gateway preset import flow opened.",
     "gatewayStarted": "{{name}} is running in frontend state.",
     "gatewayStopped": "{{name}} stopped in frontend state.",
@@ -386,7 +509,11 @@
     "rollbackConfirm": "Rollback entered confirmation state and will not overwrite config directly.",
     "diagnosticsDone": "Diagnostics completed. {{total}} checks reviewed.",
     "languageChanged": "Interface language switched.",
-    "settingUpdated": "Setting updated in frontend state."
+    "settingUpdated": "Setting updated in frontend state.",
+    "modelDeleted": "Model {{name}} deleted.",
+    "modelDeleteConfirm": "Delete model \"{{name}}\"? This removes it from custom_model_catalog.json.",
+    "subscriptionModelDeleteBlocked": "Subscription default models cannot be deleted. Hide them by turning off \"Shown in picker\".",
+    "modelDeletePending": "Delete requested for {{name}}. Click Confirm below that model."
   },
   "dashboard": {
     "greeting": {
@@ -404,13 +531,60 @@
       "settings": "Settings",
       "recheck": "Recheck",
       "viewAll": "View all →"
+    },
+    "systemStatus": {
+      "title": "System Status",
+      "desc": "Only key signals needed to decide whether the app is usable.",
+      "items": {
+        "config": "Config read",
+        "runtime": "Runtime",
+        "secrets": "Secret safety"
+      },
+      "detail": {
+        "config": "Loaded",
+        "runtime": "Ready",
+        "secrets": "Check needed"
+      }
+    },
+    "entry": {
+      "title": "Key Entry Points",
+      "desc": "Open the page for the task instead of handling details on Overview.",
+      "models": {
+        "title": "Configure Models",
+        "desc": "Add API models and manage the picker"
+      },
+      "runtime": {
+        "title": "Runtime Control",
+        "desc": "Start proxy, inject, restore, and inspect logs"
+      },
+      "diagnostics": {
+        "title": "Diagnostics",
+        "desc": "Check config, secrets, and directories"
+      },
+      "settings": {
+        "title": "Settings",
+        "desc": "Language, safety, and backup policy"
+      }
     }
   },
   "metric": {
-    "activeProfile": { "label": "ACTIVE PROFILE", "sub": "current profile / model" },
-    "provider": { "label": "PROVIDER", "sub": "model_provider config", "value": "{{count}}" },
-    "network": { "label": "NETWORK", "sub": "network route" },
-    "mcp": { "label": "MCP", "sub": "mcp_servers" }
+    "activeProfile": {
+      "label": "ACTIVE PROFILE",
+      "sub": "current profile / model"
+    },
+    "provider": {
+      "label": "PROVIDER",
+      "sub": "model_provider config",
+      "value": "{{count}}"
+    },
+    "network": {
+      "label": "NETWORK",
+      "sub": "network route"
+    },
+    "mcp": {
+      "label": "MCP",
+      "sub": "mcp_servers"
+    }
   },
   "health": {
     "title": "Config Health",

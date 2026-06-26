@@ -10,7 +10,7 @@
 //   { "object": "list", "data": [{ "id": "...", "object": "model", "owned_by": "...", ... }] }
 //
 // id 格式: "provider_name/model_id" (routing 模块按此格式解析)
-use crate::commands::opencodex as opencodex_cmd;
+use crate::commands::opencodex::{self as opencodex_cmd, ModelCatalogEntry};
 use crate::error::AppResult;
 use crate::proxy::inject_map::InjectMap;
 use serde::Serialize;
@@ -40,6 +40,16 @@ pub struct MergedModelEntry {
 
 /// 合并 inject-map + custom_model_catalog → 合并模型列表
 pub fn merged_models(map: &InjectMap) -> AppResult<MergedModelsResponse> {
+    let catalog = opencodex_cmd::opencodex_config_read()
+        .map(|cfg| cfg.catalog)
+        .unwrap_or_default();
+    merged_models_with_catalog(map, &catalog)
+}
+
+fn merged_models_with_catalog(
+    map: &InjectMap,
+    catalog: &[ModelCatalogEntry],
+) -> AppResult<MergedModelsResponse> {
     let mut data = Vec::new();
 
     // 1. inject-map providers(从 config.toml 来的)
@@ -70,23 +80,21 @@ pub fn merged_models(map: &InjectMap) -> AppResult<MergedModelsResponse> {
     }
 
     // 2. custom_model_catalog(visible=true 才合并)
-    if let Ok(cfg) = opencodex_cmd::opencodex_config_read() {
-        for entry in cfg.catalog.iter().filter(|c| c.visible) {
-            let id = entry.model_id.clone();
-            // 避免与 inject-map 重复
-            if data.iter().any(|d| d.id == id) {
-                continue;
-            }
-            data.push(MergedModelEntry {
-                id,
-                object: "model",
-                owned_by: entry.provider.clone(),
-                provider: entry.provider.clone(),
-                source: "catalog",
-                visible: entry.visible,
-                display_name: entry.display_name.clone(),
-            });
+    for entry in catalog.iter().filter(|c| c.visible) {
+        let id = entry.model_id.clone();
+        // 避免与 inject-map 重复
+        if data.iter().any(|d| d.id == id) {
+            continue;
         }
+        data.push(MergedModelEntry {
+            id,
+            object: "model",
+            owned_by: entry.provider.clone(),
+            provider: entry.provider.clone(),
+            source: "catalog",
+            visible: entry.visible,
+            display_name: entry.display_name.clone(),
+        });
     }
 
     Ok(MergedModelsResponse {
@@ -124,7 +132,7 @@ mod tests {
                 entry("zhipu", vec!["glm-4"]),
             ],
         };
-        let resp = merged_models(&map).unwrap();
+        let resp = merged_models_with_catalog(&map, &[]).unwrap();
         assert_eq!(resp.object, "list");
         let ids: Vec<&str> = resp.data.iter().map(|m| m.id.as_str()).collect();
         assert!(ids.contains(&"openai/gpt-5"));
@@ -140,7 +148,7 @@ mod tests {
             port: 1455,
             providers: vec![entry("local", vec![])],
         };
-        let resp = merged_models(&map).unwrap();
+        let resp = merged_models_with_catalog(&map, &[]).unwrap();
         assert_eq!(resp.data.len(), 1);
         assert_eq!(resp.data[0].id, "local");
         assert_eq!(resp.data[0].provider, "local");
@@ -153,7 +161,7 @@ mod tests {
             port: 1455,
             providers: vec![entry("zhipu", vec!["glm-4"])],
         };
-        let resp = merged_models(&map).unwrap();
+        let resp = merged_models_with_catalog(&map, &[]).unwrap();
         let json = serde_json::to_value(&resp).unwrap();
         assert_eq!(json["object"], "list");
         let entry = &json["data"][0];

@@ -20,6 +20,7 @@ use crate::error::{AppError, AppResult};
 use crate::proxy::inject_map::{self, InjectMap, InjectMapEntry, InjectMapWriteResult};
 use crate::proxy::state::{persist_runtime_state, ProxyState, ProxyStatus, ProxyStatusView};
 use crate::proxy::DEFAULT_PROXY_PORT;
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -34,9 +35,53 @@ pub struct ProxyModelsPreview {
     pub raw_json: serde_json::Value,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProxyRuntimeLogEntry {
+    pub at: String,
+    pub level: String,
+    pub scope: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProxyRuntimeLogs {
+    pub redacted: bool,
+    pub items: Vec<ProxyRuntimeLogEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProxySessionEntry {
+    pub id: String,
+    pub label: String,
+    pub status: String,
+    pub provider_count: usize,
+    pub model_count: usize,
+    pub last_used_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProxySessionsView {
+    pub active_session_id: Option<String>,
+    pub sessions: Vec<ProxySessionEntry>,
+}
+
 #[tauri::command]
 pub fn proxy_status(state: tauri::State<Arc<ProxyState>>) -> ProxyStatusView {
     state.inner().to_view()
+}
+
+#[tauri::command]
+pub fn proxy_runtime_logs(state: tauri::State<Arc<ProxyState>>) -> ProxyRuntimeLogs {
+    build_runtime_logs(state.inner().to_view())
+}
+
+#[tauri::command]
+pub fn proxy_sessions(state: tauri::State<Arc<ProxyState>>) -> ProxySessionsView {
+    build_sessions(state.inner().to_view())
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -63,6 +108,7 @@ pub async fn proxy_start(
     state.inner().set_inject_map(map);
 
     let port = request.port.unwrap_or(DEFAULT_PROXY_PORT);
+    validate_proxy_port(port)?;
     let port = crate::proxy::lifecycle::start(state.inner().clone(), port)
         .await
         .map_err(|e| AppError::Proxy(e.to_string()))?;
@@ -90,6 +136,7 @@ pub async fn proxy_restart(
     state: tauri::State<'_, Arc<ProxyState>>,
 ) -> AppResult<ProxyStartResult> {
     let port = request.port.unwrap_or(DEFAULT_PROXY_PORT);
+    validate_proxy_port(port)?;
     let port = crate::proxy::lifecycle::restart(state.inner().clone(), port)
         .await
         .map_err(|e| AppError::Proxy(e.to_string()))?;
@@ -155,6 +202,7 @@ pub struct InjectBaseUrlPreview {
 pub fn proxy_inject_base_url_preview(
     request: InjectBaseUrlRequest,
 ) -> AppResult<InjectBaseUrlPreview> {
+    validate_proxy_port(request.port)?;
     let path = resolve_config_path()?;
     let old_text = loader::read_raw(&path)?;
     let old_hash = loader::metadata(&path)?.content_hash;
@@ -406,6 +454,139 @@ fn current_inject_map_hash() -> AppResult<String> {
     Ok(format!("sha256-{}", short_hash(&raw)))
 }
 
+fn validate_proxy_port(port: u16) -> AppResult<()> {
+    if port == 0 {
+        return Err(AppError::Command(
+            "代理端口不能为 0,请先启动代理或使用默认端口 1455".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn build_runtime_logs(view: ProxyStatusView) -> ProxyRuntimeLogs {
+    let now = Utc::now().to_rfc3339();
+    let model_count: usize = view.providers.iter().map(|p| p.models.len()).sum();
+    let mut items = vec![ProxyRuntimeLogEntry {
+        at: now.clone(),
+        level: "info".to_string(),
+        scope: "runtime".to_string(),
+        message: format!("代理状态: {}", view.status),
+    }];
+
+    if view.port > 0 {
+        items.push(ProxyRuntimeLogEntry {
+            at: now.clone(),
+            level: "info".to_string(),
+            scope: "runtime".to_string(),
+            message: format!("本地端口已配置: {}", view.port),
+        });
+    }
+
+    if view.providers.is_empty() {
+        items.push(ProxyRuntimeLogEntry {
+            at: now.clone(),
+            level: "warn".to_string(),
+            scope: "routes".to_string(),
+            message: "尚未启用任何模型来源".to_string(),
+        });
+    } else {
+        items.push(ProxyRuntimeLogEntry {
+            at: now.clone(),
+            level: "info".to_string(),
+            scope: "routes".to_string(),
+            message: format!(
+                "已加载 {} 个模型来源, {} 个可路由模型",
+                view.provider_count, model_count
+            ),
+        });
+    }
+
+    if let Some(err) = view.last_error.as_deref().filter(|s| !s.trim().is_empty()) {
+        items.push(ProxyRuntimeLogEntry {
+            at: now.clone(),
+            level: "error".to_string(),
+            scope: "runtime".to_string(),
+            message: redact_runtime_message(err),
+        });
+    }
+
+    items.push(ProxyRuntimeLogEntry {
+        at: now,
+        level: "info".to_string(),
+        scope: "security".to_string(),
+        message: "日志已脱敏,不会输出 API Key 或请求密钥".to_string(),
+    });
+
+    ProxyRuntimeLogs {
+        redacted: true,
+        items,
+    }
+}
+
+fn build_sessions(view: ProxyStatusView) -> ProxySessionsView {
+    if view.providers.is_empty() {
+        return ProxySessionsView {
+            active_session_id: Some("default".to_string()),
+            sessions: vec![ProxySessionEntry {
+                id: "default".to_string(),
+                label: "默认会话".to_string(),
+                status: if view.status == "running" {
+                    "active".to_string()
+                } else {
+                    "idle".to_string()
+                },
+                provider_count: 0,
+                model_count: 0,
+                last_used_at: view.started_at,
+            }],
+        };
+    }
+
+    let active_session_id = view
+        .providers
+        .first()
+        .map(|p| format!("provider:{}", p.name));
+    let sessions = view
+        .providers
+        .iter()
+        .enumerate()
+        .map(|(index, provider)| ProxySessionEntry {
+            id: format!("provider:{}", provider.name),
+            label: provider.name.clone(),
+            status: if index == 0 && view.status == "running" {
+                "active".to_string()
+            } else {
+                "idle".to_string()
+            },
+            provider_count: 1,
+            model_count: provider.models.len(),
+            last_used_at: view.started_at.clone(),
+        })
+        .collect();
+
+    ProxySessionsView {
+        active_session_id,
+        sessions,
+    }
+}
+
+fn redact_runtime_message(message: &str) -> String {
+    message
+        .split_whitespace()
+        .map(|part| {
+            if part.starts_with("sk-")
+                || part.contains("api_key=")
+                || part.contains("Authorization:")
+            {
+                "[REDACTED]"
+            } else {
+                part
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 /// 改写 raw text 里的 [model_providers.<name>].base_url(跳过 subscription),
 /// 同时构造新的 inject_map
 pub fn rewrite_base_urls(
@@ -413,6 +594,7 @@ pub fn rewrite_base_urls(
     _config: &crate::config::model::CodexConfig,
     port: u16,
 ) -> AppResult<(String, InjectMap)> {
+    validate_proxy_port(port)?;
     use toml::Value;
     let mut value: Value = toml::from_str(raw)?;
     let table = value
@@ -521,4 +703,79 @@ pub fn restore_base_urls(raw: &str, entries: &[InjectMapEntry]) -> String {
         }
     }
     toml::to_string_pretty(&value).unwrap_or_else(|_| raw.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::proxy::state::ProxyRouteEntry;
+
+    fn sample_view() -> ProxyStatusView {
+        ProxyStatusView {
+            status: "running".to_string(),
+            port: 1455,
+            started_at: "2026-06-25T12:00:00Z".to_string(),
+            uptime_ms: Some(1000),
+            last_error: Some("upstream failed sk-secret-token Authorization: Bearer x".to_string()),
+            provider_count: 1,
+            providers: vec![ProxyRouteEntry {
+                name: "deepseek".to_string(),
+                original_base_url: "https://api.deepseek.com/v1".to_string(),
+                env_key: Some("DEEPSEEK_API_KEY".to_string()),
+                wire_api: "chat".to_string(),
+                kind: "compatible_api".to_string(),
+                models: vec!["deepseek-chat".to_string(), "deepseek-reasoner".to_string()],
+            }],
+        }
+    }
+
+    #[test]
+    fn runtime_logs_are_redacted_and_derived_from_status() {
+        let logs = build_runtime_logs(sample_view());
+        let text = logs
+            .items
+            .iter()
+            .map(|item| item.message.as_str())
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        assert!(logs.redacted);
+        assert!(text.contains("已加载 1 个模型来源, 2 个可路由模型"));
+        assert!(!text.contains("sk-secret-token"));
+        assert!(!text.contains("Authorization:"));
+    }
+
+    #[test]
+    fn sessions_are_derived_from_routed_providers() {
+        let sessions = build_sessions(sample_view());
+
+        assert_eq!(
+            sessions.active_session_id.as_deref(),
+            Some("provider:deepseek")
+        );
+        assert_eq!(sessions.sessions.len(), 1);
+        assert_eq!(sessions.sessions[0].label, "deepseek");
+        assert_eq!(sessions.sessions[0].status, "active");
+        assert_eq!(sessions.sessions[0].model_count, 2);
+    }
+
+    #[test]
+    fn rewrite_base_urls_rejects_zero_port() {
+        let raw = r#"
+model = "gpt-5.5"
+
+[model_providers.opencodex]
+name = "OpenCodex"
+base_url = "http://127.0.0.1:8765/v1"
+wire_api = "responses"
+"#;
+        let config = cfg_parser::parse(raw).unwrap();
+
+        let error = rewrite_base_urls(raw, &config, 0).unwrap_err();
+
+        assert!(
+            error.to_string().contains("端口") && error.to_string().contains("0"),
+            "unexpected error: {error}"
+        );
+    }
 }

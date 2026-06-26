@@ -1,16 +1,11 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  User,
-  Database,
-  Globe,
-  Puzzle,
   Activity,
-  RefreshCw,
   Settings as SettingsIcon,
 } from "lucide-react";
 import { useDashboardStore } from "@/store/dashboard";
-import { MetricCard } from "@/components/MetricCard";
+import { useUIStore } from "@/store/ui";
 
 /** 返回 i18n key，由渲染侧 t() */
 function greetingKey(): "dawn" | "morning" | "afternoon" | "evening" {
@@ -30,7 +25,8 @@ function nowStr(locale: string) {
 
 export function Dashboard() {
   const { t, i18n } = useTranslation();
-  const { data, loading, error, load } = useDashboardStore();
+  const { loading, error, load } = useDashboardStore();
+  const setActivePage = useUIStore((s) => s.setActivePage);
 
   useEffect(() => {
     load();
@@ -55,7 +51,9 @@ export function Dashboard() {
             <Activity size={12} /> {t("dashboard.buttons.daily")}
           </button>
           <button
-            className="px-3 py-1.5 rounded-md bg-ink-900/5 text-xs text-ink-700"
+            onClick={() => setActivePage("settings")}
+            className="px-3 py-1.5 rounded-md bg-ink-900/5 text-xs text-ink-700 hover:bg-ink-900/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 flex items-center justify-center"
+            aria-label={t("dashboard.buttons.settings")}
             title={t("dashboard.buttons.settings")}
           >
             <SettingsIcon size={12} />
@@ -63,87 +61,35 @@ export function Dashboard() {
         </div>
       </section>
 
-      <section className="grid grid-cols-4 gap-4">
-        <MetricCard
-          label={t("metric.activeProfile.label")}
-          value={data?.active_profile ?? "—"}
-          sub={t("metric.activeProfile.sub")}
-          icon={<User size={16} />}
-          iconColor="#34C759"
-        />
-        <MetricCard
-          label={t("metric.provider.label")}
-          value={data ? t("metric.provider.value", { count: data.provider_count }) : "—"}
-          sub={t("metric.provider.sub")}
-          icon={<Database size={16} />}
-          iconColor="#007AFF"
-        />
-        <MetricCard
-          label={t("metric.network.label")}
-          value={data?.network ?? "—"}
-          sub={t("metric.network.sub")}
-          icon={<Globe size={16} />}
-          iconColor="#5AC8FA"
-        />
-        <MetricCard
-          label={t("metric.mcp.label")}
-          value={data ? `${data.mcp_count.enabled} / ${data.mcp_count.total}` : "—"}
-          sub={t("metric.mcp.sub")}
-          icon={<Puzzle size={16} />}
-          iconColor="#AF52DE"
-        />
-      </section>
-
-      <section className="grid grid-cols-[1.5fr_1fr] gap-4">
+      <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <div className="rounded-md bg-white/[0.86] border border-white/60 shadow-card p-5">
-          <div className="flex items-center justify-between mb-3">
+          <div className="mb-3">
             <h2 className="text-sm font-semibold text-ink-900">
-              {t("health.title")}
+              {t("dashboard.systemStatus.title")}
             </h2>
-            <button
-              onClick={load}
-              className="px-3 py-1.5 rounded-md bg-ink-900/5 text-xs text-ink-700 flex items-center gap-1.5"
-            >
-              <RefreshCw size={12} /> {t("dashboard.buttons.recheck")}
-            </button>
+            <p className="mt-1 text-[12px] leading-[1.6] text-ink-500">
+              {t("dashboard.systemStatus.desc")}
+            </p>
           </div>
           <ul className="flex flex-col gap-2 text-sm">
             {[
               {
                 key: "syntax",
-                name: t("health.items.syntax"),
+                name: t("dashboard.systemStatus.items.config"),
                 status: "ok",
-                ms: t("health.ms.syntax") as string,
+                detail: t("dashboard.systemStatus.detail.config"),
               },
               {
-                key: "providerUrl",
-                name: t("health.items.providerUrl"),
+                key: "runtime",
+                name: t("dashboard.systemStatus.items.runtime"),
                 status: "ok",
-                ms: t("health.ms.providerUrl") as string,
+                detail: t("dashboard.systemStatus.detail.runtime"),
               },
               {
-                key: "auth",
-                name: t("health.items.auth"),
+                key: "secrets",
+                name: t("dashboard.systemStatus.items.secrets"),
                 status: "warn",
-                ms: t("health.ms.auth") as string,
-              },
-              {
-                key: "network",
-                name: t("health.items.network"),
-                status: "ok",
-                ms: t("health.ms.network") as string,
-              },
-              {
-                key: "mcpFs",
-                name: t("health.items.mcpFs"),
-                status: "ok",
-                ms: t("health.ms.mcpFs") as string,
-              },
-              {
-                key: "backupSpace",
-                name: t("health.items.backupSpace"),
-                status: "ok",
-                ms: t("health.ms.backupSpace") as string,
+                detail: t("dashboard.systemStatus.detail.secrets"),
               },
             ].map((c) => (
               <li key={c.key} className="flex items-center gap-2 px-1 py-1">
@@ -166,8 +112,8 @@ export function Dashboard() {
                 >
                   {t(`status.${c.status}`)}
                 </span>
-                <span className="text-[11px] text-ink-400 w-20 text-right">
-                  {c.ms}
+                <span className="text-[11px] text-ink-400 w-28 text-right">
+                  {c.detail}
                 </span>
               </li>
             ))}
@@ -175,29 +121,35 @@ export function Dashboard() {
         </div>
 
         <div className="rounded-md bg-white/[0.86] border border-white/60 shadow-card p-5">
-          <div className="flex items-center justify-between mb-3">
+          <div className="mb-3">
             <h2 className="text-sm font-semibold text-ink-900">
-              {t("activity.title")}
+              {t("dashboard.entry.title")}
             </h2>
-            <span className="text-[11px] text-ink-400">12</span>
+            <p className="mt-1 text-[12px] leading-[1.6] text-ink-500">
+              {t("dashboard.entry.desc")}
+            </p>
           </div>
-          <ul className="flex flex-col gap-2 text-sm">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {[
-              { t: "14:22", d: t("activity.items.backupDev") },
-              { t: "14:20", d: t("activity.items.switchProvider") },
-              { t: "14:18", d: t("activity.items.enableMcp") },
-              { t: "14:10", d: t("activity.items.switchRoute") },
-            ].map((a) => (
-              <li key={a.t} className="flex items-center gap-2 px-1 py-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-status-ok" />
-                <span className="text-[11px] text-ink-500 w-12">{a.t}</span>
-                <span className="text-ink-700">{a.d}</span>
-              </li>
+              { key: "models", page: "models" as const },
+              { key: "runtime", page: "codex_runtime" as const },
+              { key: "diagnostics", page: "diagnostics" as const },
+              { key: "settings", page: "settings" as const },
+            ].map((entry) => (
+              <button
+                key={entry.key}
+                onClick={() => setActivePage(entry.page)}
+                className="rounded-md border border-ink-900/[0.06] bg-white/45 px-3 py-3 text-left transition-colors hover:bg-white/75"
+              >
+                <div className="text-[13px] font-semibold text-ink-800">
+                  {t(`dashboard.entry.${entry.key}.title`)}
+                </div>
+                <div className="mt-1 text-[11px] leading-[1.45] text-ink-500">
+                  {t(`dashboard.entry.${entry.key}.desc`)}
+                </div>
+              </button>
             ))}
-          </ul>
-          <button className="mt-3 w-full px-3 py-1.5 rounded-md bg-ink-900/5 text-xs text-ink-700 flex items-center justify-center gap-1.5">
-            {t("dashboard.buttons.viewAll")}
-          </button>
+          </div>
         </div>
       </section>
     </div>

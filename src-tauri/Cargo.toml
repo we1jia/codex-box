@@ -30,7 +30,7 @@ tokio = { version = "1", features = ["fs", "io-util", "rt-multi-thread", "macros
 uuid = { version = "1", features = ["v4"] }
 
 # Codex Box 本地代理 runtime (BYOK 真链路)
-axum = { version = "0.7", features = ["macros"] }
+axum = { version = "0.7", features = ["macros", "ws"] }
 tower = "0.5"
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "json"] }
 tracing = "0.1"
@@ -47,3 +47,4 @@ strip = true
 
 [dev-dependencies]
 tempfile = "3"
+tokio-tungstenite = "0.24"

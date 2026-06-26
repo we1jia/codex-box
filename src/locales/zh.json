@@ -1,7 +1,7 @@
 {
   "nav": {
     "dashboard": "总览",
-    "models": "模型目录",
+    "models": "模型配置",
     "provider_routes": "Provider 路由",
     "codex_runtime": "Codex 运行时",
     "profiles": "工作配置",
@@ -84,7 +84,9 @@
     "restartLan": "局域网重启",
     "confirmWrite": "确认写入",
     "hide": "隐藏",
-    "show": "显示"
+    "show": "显示",
+    "showDetails": "查看详情",
+    "hideDetails": "收起详情"
   },
   "summary": {
     "totalProfiles": "工作配置数",
@@ -132,6 +134,7 @@
     "healthEndpoint": "健康检查端点",
     "baseUrl": "base_url",
     "running": "运行状态",
+    "provider": "模型来源",
     "catalogPath": "模型目录路径",
     "contentHash": "内容哈希",
     "displayName": "显示名",
@@ -148,7 +151,8 @@
     "desktopInstalled": "Desktop 已安装",
     "cliAvailable": "CLI 可用",
     "opencodexDir": "~/.opencodex 目录",
-    "note": "备注"
+    "note": "备注",
+    "absolutePath": "完整路径"
   },
   "providerKind": {
     "subscription": "官方订阅",
@@ -186,13 +190,35 @@
       "networkSubsection": "当前 provider 关联的网络路由"
     },
     "models": {
-      "title": "模型目录",
-      "subtitle": "BYOK 模型下拉来源：聚合 ~/.opencodex/custom_model_catalog.json 中所有自定义模型条目，决定 Codex App 模型下拉里能选到哪些模型。",
+      "title": "模型配置",
+      "subtitle": "像 OpenCodex 一样：填写模型名称、接口地址和 API Key，然后选择哪些模型显示在 Codex 下拉框里。",
+      "simpleConfigTitle": "新增模型配置",
+      "dropdownTitle": "Codex 下拉框模型",
       "catalogSourceTitle": "模型目录来源",
       "listTitle": "模型目录",
       "detailTitle": "模型详情",
+      "advancedTitle": "高级功能",
+      "visionTitle": "视觉降级",
+      "visionHint": "给不支持图片的文本模型启用 Vision Bridge：截图会先交给视觉模型生成文字描述，再转给当前模型。",
+      "visionEnable": "为当前模型启用视觉降级",
+      "visionModel": "视觉模型",
+      "visionEnvKey": "视觉 API 环境变量",
+      "visionSave": "保存视觉降级配置",
+      "visibleInDropdown": "显示在下拉框",
+      "hiddenInDropdown": "已隐藏",
+      "form": {
+        "modelName": "模型名称",
+        "modelNamePlaceholder": "例如：deepseek:deepseek-chat 或 gpt-5.5-custom=gpt-5.5",
+        "aliasHint": "支持 供应商:模型名，也支持 显示名=真实模型名 / 显示名->真实模型名。",
+        "baseUrl": "接口地址",
+        "apiKey": "API Key",
+        "secretHint": "可以在这里粘贴密钥；Codex Box 只写环境变量引用，不把明文密钥写进配置文件。",
+        "restartCodex": "保存后提醒重启 Codex Desktop",
+        "restartAfterUpdate": "更新后提醒重启 Codex Desktop",
+        "saveAndAdd": "保存并添加该模型"
+      },
       "byokHint": "BYOK 切模型说明",
-      "byokHintBody": "切换的不是裸 model 字段，而是整组 CodexProfile。Codex Box 写 ~/.codex/config.toml 走既有 backup → diff → confirm → atomic write 闭环，写 ~/.opencodex/custom_model_catalog.json 走相同的写入闭环。未知字段保留，方便后续与 AITabby/opencodex CLI 共存。"
+      "byokHintBody": "普通用户只需要在本页完成两步：先添加一个模型配置，再勾选它是否出现在 Codex 下拉框。高级 provider 路由、运行时注入和诊断信息仍保留在左侧对应页面。"
     },
     "providerRoutes": {
       "title": "Provider 路由",
@@ -211,39 +237,56 @@
     },
     "codexBoxRuntime": {
       "title": "Codex Box 运行时",
-      "subtitle": "本机 127.0.0.1 代理，把 Codex App 真正变成 BYOK 模型下拉。按 model id 把 /v1/models、/v1/chat/completions、/v1/responses 路由到对应 upstream provider。Inject 会改写 ~/.codex/config.toml 的 base_url，Restore 会还原。",
+      "subtitle": "本机 127.0.0.1 代理，让 Codex App 从下拉框选择 BYOK 模型。它会按 model id 把 /v1/models、/v1/chat/completions、/v1/responses 转发到对应模型来源。注入会改写 ~/.codex/config.toml 的 base_url，还原会恢复原配置。",
       "status": "状态",
       "port": "端口",
       "uptime": "运行时长",
-      "routedProviders": "已路由 provider",
+      "routedProviders": "已路由来源",
       "start": "启动",
       "stop": "停止",
       "restart": "重启",
       "notRunning": "未运行",
       "controlPanel": "控制面板",
       "stateTitle": "当前状态",
-      "endpoint": "Endpoint",
+      "endpoint": "接口地址",
       "startedAt": "启动时间",
-      "healthz": "Healthz URL",
+      "healthz": "健康检查 URL",
       "previewPanel": "/v1/models 预览",
       "preview": "预览",
       "previewHint": "先启动代理，再点预览抓取合并后的模型列表。",
       "previewUrl": "预览 URL",
-      "injectPanel": "注入 base_url → 代理",
-      "injectPreview": "查看 diff",
+      "conversationProvider": {
+        "title": "会话归属 Provider",
+        "hint": "这里编辑的是 Codex App 用来归属会话列表的 model_provider 名称。实际请求仍写到 127.0.0.1 本地代理，由模型目录里的 backend_provider 决定真实上游。",
+        "history": "历史 Provider",
+        "preview": "预览变更",
+        "originalBaseUrl": "历史 base_url",
+        "requiresOpenaiAuth": "保持 requires_openai_auth=true，用于兼容 Codex Desktop 的 OpenAI 登录态检查。",
+        "proxyBaseUrl": "实际请求地址",
+        "source": "来源文件",
+        "confirm": "确认切换"
+      },
+      "injectPanel": "启用到 Codex",
+      "injectPreview": "查看变更",
       "injectHint": "把所有非订阅 [model_providers.*] 的 base_url 重写为 http://127.0.0.1:{port}/v1，并把原值记录到 ~/.codex/codex-box/inject-map.json。Codex App 之后所有第三方流量都会走本代理。",
-      "injectDiffSummary": "Diff 摘要",
-      "injectConfirm": "确认注入",
-      "restorePanel": "还原 base_url",
-      "restorePreview": "查看 diff",
+      "injectDiffSummary": "变更摘要",
+      "injectConfirm": "确认启用",
+      "restorePanel": "恢复原配置",
+      "restorePreview": "查看变更",
       "restoreHint": "读 ~/.codex/codex-box/inject-map.json 并把原 base_url 写回 ~/.codex/config.toml。停止代理或回滚时用。",
-      "restoreConfirm": "确认还原",
-      "routeTable": "路由表 (inject-map)",
-      "routeTableCount": "共 {{count}} 个 provider",
-      "routeTableEmpty": "尚未注入任何 provider。点「注入 base_url」启用路由。",
+      "restoreConfirm": "确认恢复",
+      "routeTable": "路由表",
+      "routeTableCount": "共 {{count}} 个模型来源",
+      "routeTableEmpty": "尚未启用任何模型来源。点「启用到 Codex」开启路由。",
+      "logsPanel": "运行日志",
+      "refreshLogs": "刷新日志",
+      "logsHint": "日志属于运行时，不放在模型配置页。这里只显示脱敏后的本地运行事件。",
+      "sessionsPanel": "会话管理",
+      "refreshSessions": "刷新会话",
+      "sessionsHint": "会话和模型配置分开管理：模型决定可选能力，会话记录当前运行上下文。",
       "lastError": "最近错误",
       "safetyTitle": "安全红线",
-      "safetyBody": "代理仅监听 127.0.0.1（不绑 LAN）。API key 走 env 引用，按需懒读，绝不落盘或上日志。Inject/Restore 全程走 backup → diff → confirm → atomic write → rollback。",
+      "safetyBody": "代理仅监听 127.0.0.1（不绑局域网）。API Key 使用环境变量引用，按需读取，绝不落盘或进入日志。启用和恢复全程走备份 → 预览变更 → 确认 → 原子写入 → 可回滚。",
       "statusName": {
         "stopped": "已停止",
         "starting": "启动中",
@@ -256,15 +299,43 @@
         "restarted": "代理已重启，端口 {{port}}",
         "previewOk": "已拉取 /v1/models",
         "injectOk": "base_url 已注入，重启 Codex App 让新模型生效",
-        "restoreOk": "base_url 已还原"
+        "restoreOk": "base_url 已还原",
+        "logsReady": "运行日志已刷新。",
+        "sessionsReady": "会话列表已刷新。"
+      },
+      "logs": {
+        "empty": "暂无运行日志",
+        "items": {
+          "started": "[运行时] 本地代理状态已读取",
+          "models": "[模型] 已准备合并模型列表",
+          "redacted": "[安全] 日志已启用密钥脱敏"
+        }
+      },
+      "sessions": {
+        "active": "当前会话",
+        "idle": "待切换",
+        "meta": "{{providers}} 个来源 / {{models}} 个模型",
+        "empty": "暂无会话"
       },
       "col": {
-        "name": "Provider",
+        "name": "模型来源",
         "upstream": "原始 base_url",
-        "wire": "Wire API",
-        "envKey": "Env 引用",
-        "kind": "Kind",
+        "wire": "协议",
+        "envKey": "环境变量引用",
+        "kind": "类型",
         "models": "模型数"
+      },
+      "effectiveRouting": {
+        "title": "当前生效链路",
+        "hint": "这里展示 Codex App 实际会走的链路：model_provider → base_url/openai_base_url → model_catalog_json → backend_provider → 上游 API。",
+        "requestBaseUrl": "请求入口",
+        "requestSource": "入口来源",
+        "catalogProvider": "目录 Provider",
+        "upstream": "真实上游",
+        "proxy": "本地代理",
+        "issues": "链路检查",
+        "noIssues": "当前没有发现链路异常。",
+        "empty": "暂未读取到生效链路。"
       }
     },
     "diagnostics": {
@@ -336,21 +407,66 @@
       "byok": "BYOK 写入开关、schema 保留与可见性同步"
     },
     "options": {
-      "language": { "label": "语言", "desc": "跟随当前界面语言，可随时切换。" },
-      "theme": { "label": "主题", "desc": "保持浅色 Mac 仪表盘风格，深色模式后续接入。" },
-      "startupCheck": { "label": "启动时检查", "desc": "启动后读取 config 并刷新仪表盘摘要。" },
-      "requireDiff": { "label": "写入前强制确认变更", "desc": "任何保存动作都必须先进入配置变更页。" },
-      "maskSecrets": { "label": "Secret 脱敏", "desc": "API key、token 和密码不在 UI 或日志中明文展示。" },
-      "confirmDanger": { "label": "危险操作二次确认", "desc": "删除、回滚、覆盖配置前必须再次确认。" },
-      "backupFirst": { "label": "写入前备份", "desc": "修改 config 前自动生成备份记录。" },
-      "retention": { "label": "备份保留策略", "desc": "默认最多保留 50 个备份，后续支持设置。" },
-      "rollback": { "label": "回滚保护", "desc": "回滚前也会先备份当前状态。" },
-      "redaction": { "label": "日志脱敏", "desc": "诊断日志只保留 route、状态和耗时等摘要。" },
-      "maxSize": { "label": "日志大小限制", "desc": "日志文件达到上限后轮转，避免无限增长。" },
-      "exportReport": { "label": "导出诊断报告", "desc": "报告默认脱敏，可复制给自己排查。" },
-      "byokWriteEnabled": { "label": "BYOK 写入总开关", "desc": "关闭后 Models / Provider Routes 页只读，不能写入 ~/.opencodex/。" },
-      "byokSchemaPreserve": { "label": "BYOK schema 兼容", "desc": "读写 ~/.opencodex/*.json 时保留未知字段，便于与 AITabby CLI 共存。" },
-      "byokVisibilitySync": { "label": "可见性同步", "desc": "在 Models 页切换 visible 时，同步更新 custom_model_catalog.json。" }
+      "language": {
+        "label": "语言",
+        "desc": "跟随当前界面语言，可随时切换。"
+      },
+      "theme": {
+        "label": "主题",
+        "desc": "保持浅色 Mac 仪表盘风格，深色模式后续接入。"
+      },
+      "startupCheck": {
+        "label": "启动时检查",
+        "desc": "启动后读取 config 并刷新仪表盘摘要。"
+      },
+      "requireDiff": {
+        "label": "写入前强制确认变更",
+        "desc": "任何保存动作都必须先进入配置变更页。"
+      },
+      "maskSecrets": {
+        "label": "Secret 脱敏",
+        "desc": "API key、token 和密码不在 UI 或日志中明文展示。"
+      },
+      "confirmDanger": {
+        "label": "危险操作二次确认",
+        "desc": "删除、回滚、覆盖配置前必须再次确认。"
+      },
+      "backupFirst": {
+        "label": "写入前备份",
+        "desc": "修改 config 前自动生成备份记录。"
+      },
+      "retention": {
+        "label": "备份保留策略",
+        "desc": "默认最多保留 50 个备份，后续支持设置。"
+      },
+      "rollback": {
+        "label": "回滚保护",
+        "desc": "回滚前也会先备份当前状态。"
+      },
+      "redaction": {
+        "label": "日志脱敏",
+        "desc": "诊断日志只保留 route、状态和耗时等摘要。"
+      },
+      "maxSize": {
+        "label": "日志大小限制",
+        "desc": "日志文件达到上限后轮转，避免无限增长。"
+      },
+      "exportReport": {
+        "label": "导出诊断报告",
+        "desc": "报告默认脱敏，可复制给自己排查。"
+      },
+      "byokWriteEnabled": {
+        "label": "BYOK 写入总开关",
+        "desc": "关闭后 Models / Provider Routes 页只读，不能写入 ~/.opencodex/。"
+      },
+      "byokSchemaPreserve": {
+        "label": "BYOK schema 兼容",
+        "desc": "读写 ~/.opencodex/*.json 时保留未知字段，便于与 AITabby CLI 共存。"
+      },
+      "byokVisibilitySync": {
+        "label": "可见性同步",
+        "desc": "在 Models 页切换 visible 时，同步更新 custom_model_catalog.json。"
+      }
     }
   },
   "feedback": {
@@ -368,10 +484,17 @@
     "connectionTested": "{{name}} 连接测试已完成（模拟）。",
     "providerCopied": "已复制 {{name}} 的模型来源配置。",
     "previewDiff": "已生成配置变更预览。",
+    "simpleModelFormInvalid": "请填写模型名称、接口地址和 API Key。",
+    "simpleModelSaved": "{{name}} 已保存，并加入 Codex 下拉框模型列表。",
+    "visionFallbackSaved": "视觉降级配置已保存。",
     "modelVisibilityToggled": "{{name}} 可见性已更新。",
     "providerRouteToggled": "Provider 路由 {{name}} 已切换启用状态。",
     "providerRouteDeleted": "Provider 路由 {{name}} 已删除。",
-    "opencodexParseErrors": "BYOK 目录文件解析失败，写入已拦截：",
+    "providerKeyNeedsFix": "需要修复 API Key",
+    "conversationProviderInvalid": "Provider ID 不能为空。",
+    "conversationProviderSaved": "会话归属 Provider 已切换为 {{name}}，重启 Codex App 后生效。",
+    "opencodexParseErrors": "需要处理：有模型来源把 API Key 明文写进了配置文件。Codex Box 已暂时不使用这些 Key，但仍会显示能安全读取的数据。请把 api_key 改成 ${ENV_VAR}，真实 Key 放到系统环境变量里：",
+    "modelsEmpty": "当前模型目录为空。Provider 只是 API 来源，还需要添加模型条目，Codex App 的模型下拉里才会出现可选模型。",
     "gatewayPreset": "已打开网关预设导入流程。",
     "gatewayStarted": "{{name}} 已进入运行中状态（前端模拟）。",
     "gatewayStopped": "{{name}} 已停止（前端模拟）。",
@@ -386,7 +509,11 @@
     "rollbackConfirm": "回滚已进入确认状态，不会直接覆盖配置。",
     "diagnosticsDone": "诊断完成，共检查 {{total}} 项。",
     "languageChanged": "界面语言已切换。",
-    "settingUpdated": "设置已更新（前端状态）。"
+    "settingUpdated": "设置已更新（前端状态）。",
+    "modelDeleted": "模型 {{name}} 已删除。",
+    "modelDeleteConfirm": "确认删除模型「{{name}}」？这会从 custom_model_catalog.json 移除该条目。",
+    "subscriptionModelDeleteBlocked": "订阅默认模型不能删除；如需不显示，请关闭“显示在下拉框”。",
+    "modelDeletePending": "已选择删除 {{name}}，请在该模型下方点击“再次确认”。"
   },
   "dashboard": {
     "greeting": {
@@ -404,13 +531,60 @@
       "settings": "设置",
       "recheck": "重新检查",
       "viewAll": "查看全部 →"
+    },
+    "systemStatus": {
+      "title": "系统状态",
+      "desc": "只展示能帮助判断当前是否可用的关键状态。",
+      "items": {
+        "config": "配置读取",
+        "runtime": "运行时",
+        "secrets": "密钥安全"
+      },
+      "detail": {
+        "config": "已加载",
+        "runtime": "可启动",
+        "secrets": "需检查"
+      }
+    },
+    "entry": {
+      "title": "关键入口",
+      "desc": "按任务进入对应页面，避免在总览里处理细节。",
+      "models": {
+        "title": "配置模型",
+        "desc": "添加 API 模型并管理下拉框"
+      },
+      "runtime": {
+        "title": "运行时控制",
+        "desc": "启动代理、注入、还原、查看日志"
+      },
+      "diagnostics": {
+        "title": "诊断检查",
+        "desc": "检查配置、密钥和目录状态"
+      },
+      "settings": {
+        "title": "设置",
+        "desc": "语言、安全和备份策略"
+      }
     }
   },
   "metric": {
-    "activeProfile": { "label": "当前配置", "sub": "当前配置 / model" },
-    "provider": { "label": "模型来源", "sub": "model_provider 配置", "value": "{{count}} 个" },
-    "network": { "label": "网络", "sub": "网络路由" },
-    "mcp": { "label": "MCP", "sub": "mcp_servers" }
+    "activeProfile": {
+      "label": "当前配置",
+      "sub": "当前配置 / model"
+    },
+    "provider": {
+      "label": "模型来源",
+      "sub": "model_provider 配置",
+      "value": "{{count}} 个"
+    },
+    "network": {
+      "label": "网络",
+      "sub": "网络路由"
+    },
+    "mcp": {
+      "label": "MCP",
+      "sub": "mcp_servers"
+    }
   },
   "health": {
     "title": "配置健康",

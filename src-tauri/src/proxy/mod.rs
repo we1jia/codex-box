@@ -14,6 +14,7 @@ pub mod health;
 pub mod inject_map;
 pub mod lifecycle;
 pub mod models_endpoint;
+pub mod responses_ws;
 pub mod routing;
 pub mod server;
 pub mod state;

@@ -1,0 +1,38 @@
+{
+  "pages": {
+    "dashboard": {
+      "zh": {
+        "primary": ["系统状态", "关键入口"],
+        "advanced": []
+      },
+      "en": {
+        "primary": ["System status", "Key entry points"],
+        "advanced": []
+      }
+    },
+    "models": {
+      "zh": {
+        "primary": ["填写模型名称", "填写接口地址", "填写 API Key", "保存模型", "控制哪些模型显示在 Codex 下拉框"],
+        "advanced": ["视觉降级配置"],
+        "excluded": ["日志", "会话", "代理重启", "还原"]
+      },
+      "en": {
+        "primary": ["Enter model name", "Enter endpoint URL", "Enter API key", "Save model", "Choose which models appear in the Codex picker"],
+        "advanced": ["Vision fallback config"],
+        "excluded": ["Logs", "Sessions", "Proxy restart", "Restore"]
+      }
+    },
+    "codex_runtime": {
+      "zh": {
+        "primary": ["启动 / 停止 / 重启代理", "注入 / 还原 base_url", "日志", "会话管理"],
+        "advanced": ["模型预览", "路由表", "日志", "会话管理"],
+        "excluded": ["模型配置"]
+      },
+      "en": {
+        "primary": ["Start / stop / restart proxy", "Inject / restore base_url", "Logs", "Sessions"],
+        "advanced": ["Model preview", "Route table", "Logs", "Sessions"],
+        "excluded": ["Model config"]
+      }
+    }
+  }
+}

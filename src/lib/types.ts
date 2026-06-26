@@ -126,6 +126,10 @@ export interface ModelCatalogEntry {
   visible: boolean;
   reasoning: ReasoningConfig | null;
   note: string | null;
+  visionBridgeEnabled?: boolean | null;
+  visionFallbackBaseUrl?: string | null;
+  visionFallbackModel?: string | null;
+  visionFallbackApiKeyRef?: string | null;
 }
 
 export interface ReasoningConfig {
@@ -170,6 +174,24 @@ export interface OpenCodexWriteResult {
   filePath: string;
   backupId: string;
   newHash: string;
+}
+
+export interface SimpleModelConfigRequest {
+  modelInput: string;
+  baseUrl: string;
+  apiKey: string;
+  displayName: string | null;
+  reasoningLevel: string | null;
+  restartCodex: boolean;
+}
+
+export interface SimpleModelConfigResult {
+  provider: ProviderRoute;
+  model: ModelCatalogEntry;
+  envKey: string;
+  providerWrite: OpenCodexWriteResult;
+  catalogWrite: OpenCodexWriteResult;
+  restartCodex: boolean;
 }
 
 // Codex Runtime 检测(只读)
@@ -259,6 +281,56 @@ export interface ProxyModelsPreview {
   rawJson: unknown;
 }
 
+export interface ProxyRuntimeLogEntry {
+  at: string;
+  level: "info" | "warn" | "error" | string;
+  scope: string;
+  message: string;
+}
+
+export interface ProxyRuntimeLogs {
+  redacted: boolean;
+  items: ProxyRuntimeLogEntry[];
+}
+
+export interface ProxySessionEntry {
+  id: string;
+  label: string;
+  status: "active" | "idle" | string;
+  providerCount: number;
+  modelCount: number;
+  lastUsedAt: string;
+}
+
+export interface ProxySessionsView {
+  activeSessionId: string | null;
+  sessions: ProxySessionEntry[];
+}
+
+export interface EffectiveRoutingIssue {
+  severity: "info" | "warn" | "fail" | string;
+  code: string;
+  message: string;
+}
+
+export interface EffectiveRoutingStatus {
+  configPath: string;
+  currentModel: string | null;
+  modelProvider: string;
+  requestBaseUrl: string | null;
+  requestBaseUrlSource: string;
+  modelCatalogPath: string | null;
+  catalogConfigured: boolean;
+  catalogModelFound: boolean;
+  catalogProvider: string | null;
+  backendProvider: string | null;
+  backendModel: string | null;
+  upstreamBaseUrl: string | null;
+  proxyRunning: boolean;
+  proxyPort: number | null;
+  issues: EffectiveRoutingIssue[];
+}
+
 export interface InjectBaseUrlPreview {
   newConfigText: string;
   newHash: string;
@@ -312,4 +384,58 @@ export interface ApplyRestoreResult {
     providers: ProxyRouteEntry[];
   };
   clearedInjectMapHash: string;
+}
+
+// =====================================================================
+// 会话归属 Provider: 用于保持 Codex 对话列表归属,请求仍可映射到本地代理
+// =====================================================================
+
+export interface ConversationProviderCandidate {
+  providerId: string;
+  displayName: string | null;
+  originalBaseUrl: string | null;
+  wireApi: string;
+  requiresOpenaiAuth: boolean | null;
+  sourceKind: "current" | "backup" | "profile" | string;
+  sourcePath: string;
+  lastSeenAt: string;
+  isBuiltinOpenai: boolean;
+}
+
+export interface ConversationProviderCandidatesView {
+  activeProviderId: string;
+  configPath: string;
+  candidates: ConversationProviderCandidate[];
+}
+
+export interface ConversationProviderRequest {
+  providerId: string;
+  displayName: string | null;
+  proxyPort: number;
+  wireApi: string;
+  requiresOpenaiAuth: boolean;
+  originalBaseUrl: string | null;
+  expectedHash?: string | null;
+}
+
+export interface ConversationProviderPreview {
+  newConfigText: string;
+  expectedHash: string;
+  diff: ConfigDiffLineView[];
+  insertions: number;
+  deletions: number;
+  providerId: string;
+  proxyBaseUrl: string;
+}
+
+export interface ApplyConversationProviderResult {
+  newConfigHash: string;
+  backup: {
+    id: string;
+    created_at: string;
+    file_path: string;
+    reason: string;
+    content_hash: string;
+    size_bytes: number;
+  };
 }

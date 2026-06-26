@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { mockCodexRuntime, mockModelCatalog, mockProfiles, mockProviderRoutes, mockProviders } from "@/lib/mock-data";
+import { mockCodexRuntime, mockProfiles, mockProviderRoutes, mockProviders } from "@/lib/mock-data";
 import type {
   ConfigChangePreviewView,
   ConfigSnapshotView,
@@ -12,11 +12,18 @@ import type {
   OpenCodexWriteRequest,
   OpenCodexWriteResult,
   ProxyModelsPreview,
+  ProxyRuntimeLogs,
+  ProxySessionsView,
   ProxyStatusView,
   ProviderRoute,
   CodexRuntimeStatus,
   RestoreBaseUrlPreview,
   ApplyRestoreResult,
+  ApplyConversationProviderResult,
+  SimpleModelConfigResult,
+  ConversationProviderCandidatesView,
+  ConversationProviderPreview,
+  EffectiveRoutingStatus,
 } from "@/lib/types";
 
 export type ApiResult<T> =
@@ -80,8 +87,8 @@ function browserFallback<T>(
       schemaVersion: 1,
       providersPath: "~/.opencodex/providers.json",
       catalogPath: "~/.opencodex/custom_model_catalog.json",
-      providers: mockProviderRoutes,
-      catalog: mockModelCatalog,
+      providers: [],
+      catalog: [],
       rawProvidersText: "[]",
       rawCatalogText: "[]",
       providersContentHash: "browser-providers-hash",
@@ -111,6 +118,43 @@ function browserFallback<T>(
     return { ok: true, data: data as T };
   }
 
+  if (name === "simple_model_config_save") {
+    const data: SimpleModelConfigResult = {
+      provider: {
+        name: "browser-preview",
+        baseUrl: "https://api.example.com/v1",
+        wireApi: "chat",
+        apiKeyRef: "BROWSER_PREVIEW_API_KEY",
+        httpHeaders: {},
+        enabled: true,
+        note: "browser preview",
+      },
+      model: {
+        modelId: "browser-preview/example-model",
+        displayName: "Example Model",
+        provider: "browser-preview",
+        backendModel: "example-model",
+        backendProvider: "browser-preview",
+        visible: true,
+        reasoning: { enabled: true, levels: ["medium"] },
+        note: "browser preview",
+      },
+      envKey: "BROWSER_PREVIEW_API_KEY",
+      providerWrite: {
+        filePath: "~/.opencodex/providers.json",
+        backupId: "browser-provider-backup",
+        newHash: "browser-provider-hash",
+      },
+      catalogWrite: {
+        filePath: "~/.opencodex/custom_model_catalog.json",
+        backupId: "browser-catalog-backup",
+        newHash: "browser-catalog-hash",
+      },
+      restartCodex: Boolean((args as { request?: { restartCodex?: boolean } })?.request?.restartCodex),
+    };
+    return { ok: true, data: data as T };
+  }
+
   if (name === "codex_runtime_status") {
     const data: CodexRuntimeStatus = mockCodexRuntime;
     return { ok: true, data: data as T };
@@ -125,6 +169,77 @@ function browserFallback<T>(
       lastError: null,
       providerCount: 0,
       providers: [],
+    };
+    return { ok: true, data: data as T };
+  }
+
+  if (name === "proxy_runtime_logs") {
+    const data: ProxyRuntimeLogs = {
+      redacted: true,
+      items: [
+        {
+          at: new Date().toISOString(),
+          level: "info",
+          scope: "runtime",
+          message: "浏览器预览模式: 本地代理状态已读取",
+        },
+        {
+          at: new Date().toISOString(),
+          level: "warn",
+          scope: "routes",
+          message: "尚未启用任何模型来源",
+        },
+        {
+          at: new Date().toISOString(),
+          level: "info",
+          scope: "security",
+          message: "日志已脱敏,不会输出 API Key 或请求密钥",
+        },
+      ],
+    };
+    return { ok: true, data: data as T };
+  }
+
+  if (name === "proxy_sessions") {
+    const data: ProxySessionsView = {
+      activeSessionId: "default",
+      sessions: [
+        {
+          id: "default",
+          label: "默认会话",
+          status: "idle",
+          providerCount: 0,
+          modelCount: 0,
+          lastUsedAt: "",
+        },
+      ],
+    };
+    return { ok: true, data: data as T };
+  }
+
+  if (name === "effective_routing_status") {
+    const data: EffectiveRoutingStatus = {
+      configPath: "~/.codex/config.toml",
+      currentModel: "browser-preview/model",
+      modelProvider: "openai",
+      requestBaseUrl: "http://127.0.0.1:1455/v1",
+      requestBaseUrlSource: "openai_base_url",
+      modelCatalogPath: "~/.opencodex/custom_model_catalog.json",
+      catalogConfigured: true,
+      catalogModelFound: false,
+      catalogProvider: null,
+      backendProvider: null,
+      backendModel: null,
+      upstreamBaseUrl: null,
+      proxyRunning: false,
+      proxyPort: null,
+      issues: [
+        {
+          severity: "warn",
+          code: "browser_preview",
+          message: "浏览器预览模式使用模拟链路；真实生效链路请在 Tauri 应用中查看。",
+        },
+      ],
     };
     return { ok: true, data: data as T };
   }
@@ -152,6 +267,70 @@ function browserFallback<T>(
 
   if (name === "proxy_inject_base_url_preview" || name === "proxy_restore_base_url_preview") {
     return { ok: false, error: "浏览器预览模式不能改写 ~/.codex/config.toml" };
+  }
+
+  if (name === "conversation_provider_candidates") {
+    const data: ConversationProviderCandidatesView = {
+      activeProviderId: "openai",
+      configPath: "~/.codex/config.toml",
+      candidates: [
+        {
+          providerId: "openai",
+          displayName: "OpenAI",
+          originalBaseUrl: null,
+          wireApi: "responses",
+          requiresOpenaiAuth: true,
+          sourceKind: "current",
+          sourcePath: "~/.codex/config.toml",
+          lastSeenAt: new Date().toISOString(),
+          isBuiltinOpenai: true,
+        },
+        {
+          providerId: "custom",
+          displayName: "Custom Provider",
+          originalBaseUrl: "http://localhost:51232/v1",
+          wireApi: "responses",
+          requiresOpenaiAuth: true,
+          sourceKind: "backup",
+          sourcePath: "~/.codex/config.toml.bak",
+          lastSeenAt: new Date().toISOString(),
+          isBuiltinOpenai: false,
+        },
+      ],
+    };
+    return { ok: true, data: data as T };
+  }
+
+  if (name === "conversation_provider_preview") {
+    const data: ConversationProviderPreview = {
+      newConfigText: "",
+      expectedHash: "browser-preview",
+      insertions: 3,
+      deletions: 0,
+      providerId: "openai",
+      proxyBaseUrl: "http://127.0.0.1:1455/v1",
+      diff: [
+        { kind: "insert", content: "model_provider = \"openai\"\n", oldLine: null, newLine: 1 },
+        { kind: "insert", content: "openai_base_url = \"http://127.0.0.1:1455/v1\"\n", oldLine: null, newLine: 2 },
+        { kind: "insert", content: "model_catalog_json = \"~/.opencodex/custom_model_catalog.json\"\n", oldLine: null, newLine: 3 },
+      ],
+    };
+    return { ok: true, data: data as T };
+  }
+
+  if (name === "conversation_provider_apply") {
+    const data: ApplyConversationProviderResult = {
+      newConfigHash: "browser-new-config-hash",
+      backup: {
+        id: "browser-backup",
+        created_at: new Date().toISOString(),
+        file_path: "~/.codex/codex-box/backups/browser.toml",
+        reason: "pre_write",
+        content_hash: "browser-old-hash",
+        size_bytes: 0,
+      },
+    };
+    return { ok: true, data: data as T };
   }
 
   if (name !== "dashboard_summary") return null;

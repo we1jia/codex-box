@@ -142,50 +142,6 @@ export const mockProviderRoutes: ProviderRoute[] = [
   },
 ];
 
-// BYOK · ~/.opencodex/custom_model_catalog.json 内容 mock
-export const mockModelCatalog: ModelCatalogEntry[] = [
-  {
-    modelId: "gpt-5-codex",
-    displayName: "GPT-5 Codex (官方)",
-    provider: "codex-subscription",
-    visible: true,
-    reasoning: null,
-    note: "Codex App 官方订阅默认",
-  },
-  {
-    modelId: "gpt-5.1",
-    displayName: "GPT-5.1 (OpenAI API)",
-    provider: "openai-official-api",
-    visible: true,
-    reasoning: { enabled: true, levels: ["low", "medium", "high"] },
-    note: "官方 API · 通过 OPENAI_API_KEY",
-  },
-  {
-    modelId: "openai/gpt-5-mini",
-    displayName: "GPT-5 mini (via OpenRouter)",
-    provider: "openrouter",
-    visible: true,
-    reasoning: { enabled: true, levels: ["low", "medium", "high"] },
-    note: "OpenRouter 路由 · 第三方 OpenAI-compatible",
-  },
-  {
-    modelId: "deepseek-chat",
-    displayName: "DeepSeek Chat",
-    provider: "deepseek",
-    visible: true,
-    reasoning: null,
-    note: "国产 / 高性价比",
-  },
-  {
-    modelId: "glm-4",
-    displayName: "GLM-4 (智谱)",
-    provider: "zhipu",
-    visible: true,
-    reasoning: null,
-    note: "国产 / OpenAI-compatible",
-  },
-];
-
 // Codex Runtime 检测(只读)
 export const mockCodexRuntime: CodexRuntimeStatus = {
   codexHome: "~/.codex",
