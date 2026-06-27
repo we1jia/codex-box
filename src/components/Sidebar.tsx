@@ -3,11 +3,7 @@ import { useTranslation } from "react-i18next";
 import {
   Plus,
   LayoutDashboard,
-  Server,
   Sparkles,
-  Route,
-  Cpu,
-  Users,
   Activity,
   Settings,
   PanelLeftClose,
@@ -24,11 +20,7 @@ import { startWindowDragFromMouseEvent } from "@/lib/window-drag";
 const NAV_ITEMS = [
   { id: "dashboard", Icon: LayoutDashboard, key: "1" },
   { id: "models", Icon: Sparkles, key: "2" },
-  { id: "provider_routes", Icon: Route, key: "3" },
-  { id: "codex_runtime", Icon: Cpu, key: "4" },
-  { id: "profiles", Icon: Users, key: "5" },
-  { id: "providers", Icon: Server, key: "6" },
-  { id: "diagnostics", Icon: Activity, key: "7" },
+  { id: "logs", Icon: Activity, key: "3" },
   { id: "settings", Icon: Settings, key: "," },
 ] as const;
 

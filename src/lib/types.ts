@@ -105,7 +105,7 @@ export interface ProviderView {
   models: string[];
 }
 
-// BYOK · ProviderRoute · ~/.opencodex/providers.json 条目
+// BYOK · ProviderRoute · ~/.codex/codex-box/providers.json 条目
 export interface ProviderRoute {
   name: string;
   baseUrl: string;
@@ -114,15 +114,57 @@ export interface ProviderRoute {
   httpHeaders: Record<string, string>;
   enabled: boolean;
   note: string | null;
+  codexRouting?: CodexRoutingConfig | null;
+  codexChatReasoning?: CodexChatReasoningConfig | null;
 }
 
-// BYOK · ModelCatalogEntry · ~/.opencodex/custom_model_catalog.json 条目
+export type CodexApiFormat = "openai_responses" | "openai_chat" | "openai_messages";
+
+export interface CodexRoutingConfig {
+  enabled?: boolean;
+  defaultRouteId?: string;
+  routes?: CodexRoutingRoute[];
+}
+
+export interface CodexRoutingRoute {
+  id: string;
+  label?: string;
+  enabled?: boolean;
+  targetProviderId?: string;
+  match?: {
+    models?: string[];
+    prefixes?: string[];
+  };
+  upstream?: {
+    baseUrl?: string;
+    apiFormat?: CodexApiFormat;
+    auth?: {
+      source?: "provider_config" | "managed_account" | "managed_codex_oauth";
+      authProvider?: "codex_oauth";
+      accountId?: string;
+    };
+    apiKey?: string;
+    modelMap?: Record<string, string>;
+    codexChatReasoning?: CodexChatReasoningConfig;
+  };
+  codexChatReasoning?: CodexChatReasoningConfig;
+  capabilities?: {
+    inputModalities?: Array<"text" | "image">;
+    textOnly?: boolean;
+    supportsReasoning?: boolean;
+    codexChatReasoning?: CodexChatReasoningConfig;
+  };
+}
+
+// BYOK · ModelCatalogEntry · ~/.codex/codex-box/custom_model_catalog.json 条目
 export interface ModelCatalogEntry {
   modelId: string;
   displayName: string | null;
   provider: string;
   backendModel?: string | null;
   backendProvider?: string | null;
+  targetProvider?: string | null;
+  target_provider?: string | null;
   visible: boolean;
   reasoning: ReasoningConfig | null;
   note: string | null;
@@ -130,11 +172,46 @@ export interface ModelCatalogEntry {
   visionFallbackBaseUrl?: string | null;
   visionFallbackModel?: string | null;
   visionFallbackApiKeyRef?: string | null;
+  codexChatReasoning?: CodexChatReasoningConfig | null;
 }
 
 export interface ReasoningConfig {
   enabled: boolean;
   levels: string[];
+}
+
+export type CodexChatThinkingParam =
+  | "none"
+  | "thinking"
+  | "enable_thinking"
+  | "reasoning_split";
+
+export type CodexChatEffortParam =
+  | "none"
+  | "reasoning_effort"
+  | "reasoning.effort";
+
+export type CodexChatEffortValueMode =
+  | "passthrough"
+  | "low_high"
+  | "deepseek"
+  | "openrouter";
+
+export type CodexChatReasoningOutputFormat =
+  | "auto"
+  | "reasoning_content"
+  | "reasoning"
+  | "reasoning_details"
+  | "think_tags";
+
+export interface CodexChatReasoningConfig {
+  supportsThinking?: boolean;
+  supportsEffort?: boolean;
+  thinkingParam?: CodexChatThinkingParam;
+  effortParam?: CodexChatEffortParam;
+  effortValueMode?: CodexChatEffortValueMode;
+  minOutputTokens?: number;
+  outputFormat?: CodexChatReasoningOutputFormat;
 }
 
 // BYOK · ~/.opencodex/ 完整快照
@@ -180,6 +257,7 @@ export interface SimpleModelConfigRequest {
   modelInput: string;
   baseUrl: string;
   apiKey: string;
+  wireApi: "chat" | "responses" | "sse_stream" | "custom";
   displayName: string | null;
   reasoningLevel: string | null;
   restartCodex: boolean;
@@ -191,7 +269,119 @@ export interface SimpleModelConfigResult {
   envKey: string;
   providerWrite: OpenCodexWriteResult;
   catalogWrite: OpenCodexWriteResult;
+  requiresMultirouterSync: boolean;
   restartCodex: boolean;
+}
+
+export interface CodexMultirouterSyncRequest {
+  providersExpectedHash: string;
+  catalogExpectedHash: string;
+  proxyPort?: number | null;
+  routerProviderId?: string | null;
+  ensureCodexConfig?: boolean | null;
+}
+
+export interface CodexMultirouterSyncResult {
+  routerProvider: ProviderRoute;
+  routeCount: number;
+  routedModelCount: number;
+  skippedModels: string[];
+  proxyBaseUrl: string;
+  providerWrite: OpenCodexWriteResult;
+  catalogWrite: OpenCodexWriteResult;
+  configWrite?: OpenCodexWriteResult | null;
+  modelsCacheWrite?: OpenCodexWriteResult | null;
+  injectMapWrite?: OpenCodexWriteResult | null;
+  configTouched: boolean;
+  modelsCacheTouched: boolean;
+  injectMapTouched: boolean;
+}
+
+export interface CodexMultirouterPreviewRequest {
+  proxyPort?: number | null;
+  routerProviderId?: string | null;
+  ensureCodexConfig?: boolean | null;
+}
+
+export interface CodexMultirouterPreview {
+  providersPath: string;
+  catalogPath: string;
+  configPath: string;
+  modelsCachePath: string;
+  injectMapPath: string;
+  providersExpectedHash: string;
+  catalogExpectedHash: string;
+  configExpectedHash: string;
+  modelsCacheExpectedHash: string;
+  injectMapExpectedHash: string;
+  routerProviderId: string;
+  proxyPort: number;
+  providersDiff: ConfigDiffLineView[];
+  catalogDiff: ConfigDiffLineView[];
+  configDiff: ConfigDiffLineView[];
+  modelsCacheDiff: ConfigDiffLineView[];
+  injectMapDiff: ConfigDiffLineView[];
+  routerProvider: ProviderRoute;
+  routeCount: number;
+  routedModelCount: number;
+  skippedModels: string[];
+  proxyBaseUrl: string;
+  ensureCodexConfig: boolean;
+  modelsCacheTouched: boolean;
+  injectMapTouched: boolean;
+}
+
+export interface CodexModelsCacheRestorePreview {
+  modelsCachePath: string;
+  backupPath: string;
+  modelsCacheExpectedHash: string;
+  backupExists: boolean;
+  ownedCache: boolean;
+  restoreAvailable: boolean;
+  willDelete: boolean;
+  diff: ConfigDiffLineView[];
+}
+
+export interface CodexModelsCacheRestoreResult {
+  modelsCachePath: string;
+  backupPath: string;
+  backupId: string;
+  newHash: string;
+  restored: boolean;
+  deleted: boolean;
+}
+
+export interface ConfigImportSource {
+  id: string;
+  displayName: string;
+  sourceKind: string;
+  path: string;
+  providers: number;
+  models: number;
+  configSnapshots: number;
+  warnings: string[];
+  recommendedAction: string;
+  canImport: boolean;
+}
+
+export interface ConfigImportPreview {
+  sourceId: string;
+  providersSourcePath: string;
+  catalogSourcePath: string;
+  providersTargetPath: string;
+  catalogTargetPath: string;
+  providersExpectedHash: string;
+  catalogExpectedHash: string;
+  providersDiff: ConfigDiffLineView[];
+  catalogDiff: ConfigDiffLineView[];
+  providers: number;
+  models: number;
+  warnings: string[];
+}
+
+export interface ApplyConfigImportResult {
+  providerWrite: OpenCodexWriteResult;
+  catalogWrite: OpenCodexWriteResult;
 }
 
 // Codex Runtime 检测(只读)
@@ -245,6 +435,183 @@ export interface DiagnosticGroupView {
   }>;
 }
 
+export interface CodexDesktopIntegrationStatus {
+  configPath: string;
+  configParsed: boolean;
+  configError: string | null;
+  model: string | null;
+  modelProvider: string | null;
+  modelCatalogJson: string | null;
+  customModelCatalogPath: string;
+  customModelCatalogExists: boolean;
+  customCatalogNativeOpenaiModelCount: number;
+  customCatalogByokModelCount: number;
+  officialRouteConfigured: boolean;
+  officialRouteModelCount: number;
+  officialRouteAuthSource: string | null;
+  officialRouteBaseUrl: string | null;
+  routerProviderBaseUrl: string | null;
+  routerProviderRequiresOpenaiAuth: boolean | null;
+  routerProviderSupportsWebsockets: boolean | null;
+  routerProviderUsesProxyManagedBearer: boolean | null;
+  routerProviderModelsCount: number | null;
+  modelsCachePath: string;
+  modelsCacheExists: boolean;
+  modelsCacheOwnedByCodexBox: boolean;
+  modelsCacheModelCount: number | null;
+  modelsCacheClientVersionPresent: boolean;
+  authPath: string;
+  authJsonExists: boolean;
+  authMode: string | null;
+  chatgptAuthLikely: boolean;
+  openaiApiKeyPresentInAuth: boolean;
+  codexRunning: boolean;
+  codexRemoteDebuggingPort: number | null;
+  codexProcesses: CodexProcessView[];
+  pickerReadinessStatus: string;
+  pickerReadinessSummary: string;
+  pickerReadinessBlockers: string[];
+  pickerReadinessWarnings: string[];
+  issues: CodexDesktopIntegrationIssue[];
+}
+
+export interface CodexPickerUnlockResult {
+  attemptedPorts: number[];
+  debugPort: number | null;
+  targetCount: number;
+  injectedTargetCount: number;
+  rendererReports: PickerRendererReport[];
+  modelCount: number;
+  modelNames: string[];
+  injected: boolean;
+  launched: boolean;
+  codexExecutable: string | null;
+  status: string;
+  message: string;
+  errors: string[];
+}
+
+export interface PickerRendererReport {
+  port: number;
+  targetId: string;
+  status: string;
+  patchKey: string | null;
+  modelCount: number | null;
+  availableModels: string[];
+  errorCount: number | null;
+}
+
+export interface CodexProcessView {
+  pid: number | null;
+  command: string;
+  remoteDebuggingPort: number | null;
+}
+
+export interface CodexDesktopIntegrationIssue {
+  severity: "ok" | "warn" | "fail" | string;
+  code: string;
+  message: string;
+}
+
+export interface CodexHistoryReconcileView {
+  codexHome: string;
+  configPath: string;
+  liveConfigModelProvider: string | null;
+  suggestedTargetProvider: string;
+  sourceProviderIds: string[];
+  activeStateDbPath: string | null;
+  activeStateDbKind: string | null;
+  providersFound: string[];
+  sqliteStores: CodexHistoryStoreSummary[];
+  jsonlSummary: CodexHistoryJsonlSummary;
+  sessionIndexPath: string;
+  sessionIndexExists: boolean;
+  globalStatePath: string;
+  globalStateExists: boolean;
+  driftDetected: boolean;
+  providerRowsToUpdate: number;
+  rolloutProviderLinesToUpdate: number;
+  warnings: CodexHistoryWarning[];
+}
+
+export interface CodexHistoryStoreSummary {
+  path: string;
+  kind: string;
+  total: number;
+  providerCounts: Record<string, number>;
+  readable: boolean;
+  error: string | null;
+}
+
+export interface CodexHistoryJsonlSummary {
+  roots: string[];
+  totalFiles: number;
+  providerCounts: Record<string, number>;
+  unreadableFiles: number;
+}
+
+export interface CodexHistoryWarning {
+  severity: "ok" | "warn" | "fail" | string;
+  code: string;
+  message: string;
+}
+
+export interface CodexHistoryUnifyRequest {
+  targetProvider?: string | null;
+  sourceProviderIds?: string[] | null;
+  projectPath?: string | null;
+  force?: boolean | null;
+}
+
+export interface CodexHistoryUnifyPreview {
+  codexHome: string;
+  targetProvider: string;
+  sourceProviderIds: string[];
+  activeStateDbPath: string | null;
+  activeStateDbKind: string | null;
+  providerRowsToUpdate: number;
+  rolloutFilesToUpdate: number;
+  rolloutProviderLinesToUpdate: number;
+  userEventRowsToUpdate: number;
+  visibleCandidateRows: number;
+  sessionIndexMissingToAppend: number;
+  focusRowsToMove: number;
+  workspaceHintsToFix: number;
+  projectlessIdsToRemove: number;
+  savedWorkspaceRootsToAdd: number;
+  sessionIndexPath: string;
+  sessionIndexExists: boolean;
+  globalStatePath: string;
+  globalStateExists: boolean;
+  backupDir: string;
+  codexRunning: boolean;
+  codexProcesses: string[];
+  canApply: boolean;
+  warnings: CodexHistoryWarning[];
+}
+
+export interface CodexHistoryBackupSummary {
+  backupDir: string;
+  files: string[];
+  rolloutManifestPath: string;
+}
+
+export interface CodexHistoryUnifyApplyResult {
+  preview: CodexHistoryUnifyPreview;
+  backup: CodexHistoryBackupSummary;
+  providerRowsUpdated: number;
+  rolloutFilesUpdated: number;
+  rolloutProviderLinesUpdated: number;
+  userEventRowsUpdated: number;
+  focusRowsUpdated: number;
+  sessionIndexAppended: number;
+  sessionIndexRowsMoved: number;
+  sessionIndexTitlesUpdated: number;
+  workspaceHintsFixed: number;
+  projectlessIdsRemoved: number;
+  savedWorkspaceRootsAdded: number;
+}
+
 export interface SettingsSectionView {
   id: string;
   titleKey: string;
@@ -279,6 +646,31 @@ export interface ProxyStatusView {
 export interface ProxyModelsPreview {
   baseUrl: string;
   rawJson: unknown;
+}
+
+export interface ProxyRouteTestStep {
+  id: string;
+  label: string;
+  status: "passed" | "failed" | "warning" | "skipped" | string;
+  detail: string;
+}
+
+export interface ProxyRouteTestResult {
+  status: "passed" | "failed" | string;
+  modelId: string;
+  providerName: string | null;
+  upstreamModel: string | null;
+  upstreamBaseUrl: string | null;
+  wireApi: string | null;
+  authSource: string | null;
+  textOnly: boolean;
+  usedChatFallback: boolean;
+  imagePartSentToChat: boolean;
+  upstreamStatusCode: number | null;
+  upstreamLatencyMs: number | null;
+  chatRequestPreview: unknown | null;
+  steps: ProxyRouteTestStep[];
+  warnings: string[];
 }
 
 export interface ProxyRuntimeLogEntry {
@@ -384,6 +776,36 @@ export interface ApplyRestoreResult {
     providers: ProxyRouteEntry[];
   };
   clearedInjectMapHash: string;
+}
+
+export interface ByokActivationPreview {
+  newConfigText: string;
+  expectedHash: string;
+  diff: ConfigDiffLineView[];
+  insertions: number;
+  deletions: number;
+  modelId: string;
+  backendProvider: string;
+  backendModel: string;
+  proxyBaseUrl: string;
+  modelCatalogPath: string;
+  conversationProviderId: string;
+  reasoningEffort: string | null;
+}
+
+export interface ApplyByokActivationResult {
+  newConfigHash: string;
+  backup: {
+    id: string;
+    created_at: string;
+    file_path: string;
+    reason: string;
+    content_hash: string;
+    size_bytes: number;
+  };
+  modelId: string;
+  backendProvider: string;
+  proxyBaseUrl: string;
 }
 
 // =====================================================================

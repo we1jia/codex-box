@@ -155,6 +155,18 @@ body {
     @apply rounded-md border border-ink-900/[0.06] bg-white/[0.58];
   }
 
+  /* 自动对齐：靠近右边界时反向，避免 tooltip 溢出 main 滚动容器 */
+  .info-tip-auto {
+    /* 默认靠左对齐（与 .left-0 等效） */
+    left: 0;
+    /* 触发器 hover/focus 时由 JS 计算：靠近 main 右边缘则改 right: 0 */
+  }
+  /* 当按钮 ⓘ 处于卡片右半区时，JS 会给父容器加 .info-tip-flip */
+  .info-tip-flip > [role="tooltip"] {
+    left: auto;
+    right: 0;
+  }
+
   .cb-page-title {
     @apply text-[22px] font-semibold text-ink-900 tracking-[-0.01em] leading-tight;
   }
@@ -180,19 +192,19 @@ body {
   }
 
   .cb-button {
-    @apply inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45;
+    @apply inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 text-xs font-medium transition-colors active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45;
   }
 
   .cb-button-primary {
-    @apply inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md bg-ink-900 px-3 text-xs font-medium text-white transition-colors hover:bg-ink-700 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45;
+    @apply inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md bg-ink-900 px-3 text-xs font-medium text-white transition-colors hover:bg-ink-700 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45;
   }
 
   .cb-button-secondary {
-    @apply inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border border-ink-900/[0.08] bg-white/60 px-3 text-xs font-medium text-ink-700 transition-colors hover:bg-white active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45;
+    @apply inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-ink-900/[0.08] bg-white/60 px-3 text-xs font-medium text-ink-700 transition-colors hover:bg-white active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45;
   }
 
   .cb-button-danger {
-    @apply inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border border-status-fail/20 bg-status-fail/10 px-3 text-xs font-medium text-status-fail transition-colors hover:bg-status-fail/15 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45;
+    @apply inline-flex h-8 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-status-fail/20 bg-status-fail/10 px-3 text-xs font-medium text-status-fail transition-colors hover:bg-status-fail/15 active:translate-y-px disabled:cursor-not-allowed disabled:opacity-45;
   }
 
   .cb-list-item {

@@ -22,16 +22,40 @@
         "excluded": ["Logs", "Sessions", "Proxy restart", "Restore"]
       }
     },
-    "codex_runtime": {
+    "model_router": {
       "zh": {
-        "primary": ["启动 / 停止 / 重启代理", "注入 / 还原 base_url", "日志", "会话管理"],
-        "advanced": ["模型预览", "路由表", "日志", "会话管理"],
-        "excluded": ["模型配置"]
+        "primary": ["汇总 API 服务来源", "汇总下拉框模型", "生成发布变更预览", "发布到 Codex App", "检查模型到 API 服务的链路", "注入 Codex App 下拉框"],
+        "advanced": ["真实上游测试", "Codex Desktop 下拉框解锁"],
+        "excluded": ["模型编辑", "API 服务编辑", "日志", "会话"]
       },
       "en": {
-        "primary": ["Start / stop / restart proxy", "Inject / restore base_url", "Logs", "Sessions"],
-        "advanced": ["Model preview", "Route table", "Logs", "Sessions"],
-        "excluded": ["Model config"]
+        "primary": ["Summarize API service sources", "Summarize picker models", "Generate the publish diff", "Publish to Codex App", "Check the model-to-API-service chain", "Inject the Codex App picker"],
+        "advanced": ["Real upstream test", "Codex Desktop picker unlock"],
+        "excluded": ["Model editing", "API service editing", "Logs", "Sessions"]
+      }
+    },
+    "provider_routes": {
+      "zh": {
+        "primary": ["管理 API 服务", "配置接口地址", "配置 API Key 环境变量", "供模型配置选择使用"],
+        "advanced": ["providers.json", "content hash", "http_headers", "wire_api"],
+        "excluded": ["工作配置", "Codex App 注入", "日志", "会话"]
+      },
+      "en": {
+        "primary": ["Manage API services", "Configure endpoint URL", "Configure API key env vars", "Used by model configs"],
+        "advanced": ["providers.json", "content hash", "http_headers", "wire_api"],
+        "excluded": ["Work profiles", "Codex App injection", "Logs", "Sessions"]
+      }
+    },
+    "codex_runtime": {
+      "zh": {
+        "primary": ["判断 Codex 是否已连接", "启动本地 127.0.0.1 连接", "生成发布变更预览", "把模型目录注入 Codex App 下拉框", "检查模型到 API 服务的链路"],
+        "advanced": ["模型预览", "旧注入工具", "路由表", "日志", "会话管理"],
+        "excluded": ["工作配置", "模型编辑"]
+      },
+      "en": {
+        "primary": ["Decide whether Codex is connected", "Start the local 127.0.0.1 connection", "Generate the publish diff", "Inject the model catalog into the Codex App picker", "Check the model-to-API-service chain"],
+        "advanced": ["Model preview", "Legacy injection tools", "Route table", "Logs", "Sessions"],
+        "excluded": ["Work profiles", "Model editing"]
       }
     }
   }

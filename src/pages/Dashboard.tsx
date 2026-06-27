@@ -1,9 +1,6 @@
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  Activity,
-  Settings as SettingsIcon,
-} from "lucide-react";
+import { Settings as SettingsIcon } from "lucide-react";
 import { useDashboardStore } from "@/store/dashboard";
 import { useUIStore } from "@/store/ui";
 
@@ -47,9 +44,6 @@ export function Dashboard() {
               : t("dashboard.statusOk", { time: nowStr(i18n.language) })}
         </p>
         <div className="mt-4 flex items-center gap-2">
-          <button className="px-3 py-1.5 rounded-md bg-ink-900/5 text-xs text-ink-700 flex items-center gap-1.5">
-            <Activity size={12} /> {t("dashboard.buttons.daily")}
-          </button>
           <button
             onClick={() => setActivePage("settings")}
             className="px-3 py-1.5 rounded-md bg-ink-900/5 text-xs text-ink-700 hover:bg-ink-900/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0A84FF]/30 flex items-center justify-center"
@@ -132,8 +126,7 @@ export function Dashboard() {
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {[
               { key: "models", page: "models" as const },
-              { key: "runtime", page: "codex_runtime" as const },
-              { key: "diagnostics", page: "diagnostics" as const },
+              { key: "logs", page: "logs" as const },
               { key: "settings", page: "settings" as const },
             ].map((entry) => (
               <button

@@ -23,6 +23,7 @@ pub fn run() {
                 let map = crate::proxy::inject_map::read_inject_map()
                     .unwrap_or_else(|_| Default::default());
                 state.set_inject_map(map);
+                state.log_event("info", "runtime", "Codex Box auto-start requested");
                 if let Err(err) =
                     crate::proxy::lifecycle::start(state, crate::proxy::DEFAULT_PROXY_PORT).await
                 {
@@ -34,27 +35,47 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::dashboard::dashboard_summary,
             commands::effective_routing::effective_routing_status,
+            commands::history::codex_history_reconcile,
+            commands::history::codex_history_unify_preview,
+            commands::history::codex_history_unify_apply,
             commands::config_snapshot::config_snapshot,
             commands::config_write::config_change_preview,
             commands::config_write::config_change_apply,
             commands::conversation_provider::conversation_provider_candidates,
             commands::conversation_provider::conversation_provider_preview,
             commands::conversation_provider::conversation_provider_apply,
+            commands::conversation_provider::byok_activation_preview,
+            commands::conversation_provider::byok_activation_apply,
             commands::opencodex::opencodex_config_read,
+            commands::opencodex::config_import_sources_scan,
+            commands::opencodex::opencodex_import_preview,
+            commands::opencodex::opencodex_import_apply,
             commands::opencodex::provider_route_upsert,
             commands::opencodex::provider_route_delete,
             commands::opencodex::catalog_entry_upsert,
             commands::opencodex::catalog_entry_delete,
             commands::opencodex::simple_model_config_save,
+            commands::opencodex::codex_multirouter_preview,
+            commands::opencodex::codex_multirouter_apply,
+            commands::opencodex::codex_multirouter_sync,
+            commands::opencodex::codex_models_cache_restore_preview,
+            commands::opencodex::codex_models_cache_restore_apply,
             commands::proxy::proxy_status,
             commands::proxy::proxy_start,
             commands::proxy::proxy_stop,
             commands::proxy::proxy_restart,
             commands::proxy::proxy_models_preview,
+            commands::proxy::proxy_route_test,
             commands::proxy::proxy_inject_base_url_preview,
             commands::proxy::proxy_inject_base_url_apply,
             commands::proxy::proxy_restore_base_url_preview,
             commands::proxy::proxy_restore_base_url_apply,
+            commands::codex_desktop::codex_desktop_picker_unlock,
+            commands::codex_desktop::codex_desktop_launch_with_debugging_and_unlock,
+            commands::system::codex_runtime_status,
+            commands::system::codex_desktop_integration_status,
+            commands::system::open_path,
+            commands::system::reveal_path,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

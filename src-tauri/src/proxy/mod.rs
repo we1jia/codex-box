@@ -19,6 +19,7 @@ pub mod routing;
 pub mod server;
 pub mod state;
 pub mod upstream;
+pub mod vision_bridge;
 
 pub use inject_map::{InjectMap, InjectMapEntry};
 pub use lifecycle::ProxyError;

@@ -102,7 +102,7 @@ export const mockProviders: ProviderView[] = [
   },
 ];
 
-// BYOK · ~/.opencodex/providers.json 内容 mock
+// BYOK · ~/.codex/codex-box/providers.json 内容 mock
 export const mockProviderRoutes: ProviderRoute[] = [
   {
     name: "openrouter",
@@ -232,8 +232,8 @@ export const mockDiagnostics: DiagnosticGroupView[] = [
     id: "byok",
     titleKey: "diagnostics.groups.byok",
     items: [
-      { id: "providersJson", labelKey: "diagnostics.items.providersJson", detail: "~/.opencodex/providers.json", status: "ok" },
-      { id: "catalogJson", labelKey: "diagnostics.items.catalogJson", detail: "~/.opencodex/custom_model_catalog.json", status: "ok" },
+      { id: "providersJson", labelKey: "diagnostics.items.providersJson", detail: "~/.codex/codex-box/providers.json", status: "ok" },
+      { id: "catalogJson", labelKey: "diagnostics.items.catalogJson", detail: "~/.codex/codex-box/custom_model_catalog.json", status: "ok" },
     ],
   },
   {

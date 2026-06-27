@@ -4,15 +4,13 @@ import { Dashboard } from "@/pages/Dashboard";
 import { PAGE_IDS, type PageId, useUIStore } from "@/store/ui";
 import { startWindowDragFromMouseEvent } from "@/lib/window-drag";
 import { useTranslation } from "react-i18next";
-import { Languages, Search, Settings as SettingsIcon } from "lucide-react";
+import { Languages, Settings as SettingsIcon } from "lucide-react";
 import { setLanguage } from "@/lib/i18n";
 import {
   CodexRuntimePage,
-  DiagnosticsPage,
+  LogsPage,
+  ModelRouterPage,
   ModelsPage,
-  ProfilesPage,
-  ProviderRoutesPage,
-  ProvidersPage,
   SettingsPage,
 } from "@/pages/WorkspacePages";
 
@@ -36,16 +34,12 @@ function ActivePage() {
   switch (activePage) {
     case "models":
       return <ModelsPage />;
-    case "provider_routes":
-      return <ProviderRoutesPage />;
+    case "model_router":
+      return <ModelRouterPage />;
     case "codex_runtime":
       return <CodexRuntimePage />;
-    case "profiles":
-      return <ProfilesPage />;
-    case "providers":
-      return <ProvidersPage />;
-    case "diagnostics":
-      return <DiagnosticsPage />;
+    case "logs":
+      return <LogsPage />;
     case "settings":
       return <SettingsPage />;
     case "dashboard":
@@ -111,14 +105,6 @@ export default function App() {
         <div
           className="h-full flex items-center justify-end gap-2 text-ink-500 pr-1"
         >
-          <button
-            data-no-window-drag
-            className="flex items-center gap-1 h-6 px-1.5 rounded-md hover:bg-black/[0.04] text-ink-500 transition-colors"
-            title={t("header.searchHint")}
-          >
-            <Search size={12} />
-            <span className="text-[10px] font-medium text-ink-400">⌘K</span>
-          </button>
           <button
             data-no-window-drag
             onClick={() => setActivePage("settings")}

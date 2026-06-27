@@ -12,7 +12,7 @@ use crate::proxy::server::{build_router, ServerState};
 use crate::proxy::state::{persist_runtime_state, ProxyState, ProxyStatus};
 use chrono::Utc;
 use reqwest::Client;
-use std::net::SocketAddr;
+use std::net::{SocketAddr, TcpStream};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
@@ -59,8 +59,46 @@ pub async fn probe_port(start: u16) -> AppResult<u16> {
     )))
 }
 
+/// 用真实 socket 判断本机端口是否可连接。
+pub fn is_port_accepting(port: u16) -> bool {
+    if port == 0 {
+        return false;
+    }
+    let Ok(addr) = format!("127.0.0.1:{port}").parse::<SocketAddr>() else {
+        return false;
+    };
+    TcpStream::connect_timeout(&addr, Duration::from_millis(150)).is_ok()
+}
+
+/// 修正“状态显示 running，但端口没有 listener”的漂移。
+pub fn reconcile_running_state(state: &ProxyState) {
+    if state.status() != ProxyStatus::Running {
+        return;
+    }
+    let port = state.port();
+    if is_port_accepting(port) {
+        return;
+    }
+    state.set_status(ProxyStatus::Failed);
+    state.set_last_error(Some(format!(
+        "proxy state was running, but 127.0.0.1:{port} is not accepting connections"
+    )));
+    persist_runtime_state(state);
+}
+
 /// 启动代理(后台 tokio task)
 pub async fn start(state: Arc<ProxyState>, requested_port: u16) -> Result<u16, ProxyError> {
+    reconcile_running_state(&state);
+    let existing_port = state.port();
+    if state.status() == ProxyStatus::Running && is_port_accepting(existing_port) {
+        state.log_event(
+            "info",
+            "runtime",
+            format!("proxy already running on 127.0.0.1:{existing_port}"),
+        );
+        return Ok(existing_port);
+    }
+
     state.set_status(ProxyStatus::Starting);
     state.set_last_error(None);
 
@@ -109,9 +147,17 @@ pub async fn start(state: Arc<ProxyState>, requested_port: u16) -> Result<u16, P
     state.set_port(port);
     state.set_started_at(Utc::now().to_rfc3339());
     state.set_status(ProxyStatus::Running);
+    state.log_event(
+        "info",
+        "runtime",
+        format!(
+            "proxy started on 127.0.0.1:{port}; inject-map entries={}; catalog routes are resolved from providers.json/custom_model_catalog.json",
+            state.inject_map().providers.len()
+        ),
+    );
     persist_runtime_state(&state);
 
-    let mut shutdown_rx = state.shutdown_receiver();
+    let mut shutdown_rx = state.fresh_shutdown_receiver();
 
     // serve task
     tokio::spawn(async move {
@@ -136,6 +182,7 @@ pub fn stop(state: &ProxyState) {
     state.set_status(ProxyStatus::Stopped);
     state.set_started_at(String::new());
     state.set_last_error(None);
+    state.log_event("info", "runtime", "proxy stopped");
     persist_runtime_state(state);
 }
 

@@ -70,12 +70,27 @@ Codex App 在启动或"重读配置"时读 `~/.codex/config.toml`。AITabby/open
 
 之后 Codex App 拉 `/v1/models` 时看到的是本地代理合并后的模型列表；发送 `/v1/responses` 或 `/v1/chat/completions` 时，本地代理再按 catalog 的 `slug/backend_model/backend_provider` 和 `providers.json` 路由到真实 upstream。
 
+源码补充事实（2026-06-27 复核）：
+
+- OpenCodex 会读取 `~/.codex/models_cache.json`，把 Codex 原生 GPT 模型合并进 `custom_model_catalog.json`，这些 native model 使用 `provider = "openai"` 且不写 `backend_provider`。
+- OpenCodex 的 `/v1/models` 返回 catalog 里的裸 `slug`，不是 `provider/model` 命名空间。
+- 对第三方模型，OpenCodex 的 `translator.ts` 提供 Responses ↔ Chat 的兼容层，处理 `<think>` 过滤、reasoning、tool calls、conversation history 等状态。
+- 因此 Codex Box 的正确方向不是把 Responses provider 统一降级成 Chat，而是：上游支持 Responses 时优先 passthrough/minimal normalize；上游只支持 Chat 时才走 translator。Codex Box 的 Rust proxy 已补齐 Chat fallback 下的 reasoning/tool-call/history 核心状态机，OpenCodex 的 voice / vision bridge / computer-use 专项逻辑不纳入 BYOK 主线。
+
+CCSwitchMulti / `BigStrongSun/cc-switch` 源码复核（2026-06-27，本地检出：`/Users/liuweijia/Desktop/AI/ccswitchmulti`）：
+
+- Codex MultiRouter 的关键不是把多个真实 provider 直接写进 Codex App，而是创建一个本地 router provider，`settingsConfig.modelCatalog` 决定 Codex 下拉框展示，`settingsConfig.codexRouting.routes` 决定请求按 model id 分流到哪个真实 provider。
+- `codexRouting.routes[].match.models/prefixes` 负责匹配 picker model id，`targetProviderId` 指向真实 provider，`upstream.apiFormat` 标记真实上游是 `openai_responses` 还是 `openai_chat`，`upstream.modelMap` 负责 picker model id 到上游 model id 的改写。
+- takeover 写入 Codex live config 时，MultiRouter 需要稳定的 router provider id。CCSwitchMulti 使用 `codex_model_router_v2` 作为运行桶，并关闭 WebSocket 直连上游能力；请求进入本地代理后才做 Responses passthrough 或 Responses→Chat translator。Codex Box 新写入默认对齐该稳定桶，旧 `codex_local_access` 仅作为历史兼容来源识别。
+- Codex Desktop renderer 可能继续按 Statsig `available_models/use_hidden_models` 白名单过滤模型。CCSwitchMulti 通过 CDP 注入补丁修 `available_models`、`model/list`、`list-models-for-host` 和 renderer 状态；Codex Box 已实现用户显式点击的 `codex_desktop_picker_unlock`,只在 Codex Desktop 已经开放 CDP 时注入当前 renderer,并覆盖 Statsig、响应 JSON、MCP `model/list`、app-server `list-models-for-host` 与 React auth context 路径,不自动重启、不改 `app.asar`。
+- Codex Box 已按该 schema 增加 `ProviderRoute.codexRouting` 读写保留，并在 Rust proxy resolver 中实现 catalog 命中 MultiRouter provider 后的二次路由。native GPT/Codex catalog entry 会优先匹配自动生成的 `openai-official` route(`auth.source = "managed_codex_oauth"`),只有无 route 时才落到 native fallback。
+
 所以 AITabby/opencodex 与 Codex Box 的接入链路是：
 
 ```
 Codex Box UI
    ↓ 写入
-~/.opencodex/{providers.json, custom_model_catalog.json}   (Codex Box 内部维护)
+~/.codex/codex-box/{providers.json, custom_model_catalog.json}   (Codex Box 内部维护)
    ↓ 注入
 ~/.codex/config.toml                                       (Codex App 读取 127.0.0.1 base_url + catalog path)
    ↓ /v1/models

@@ -62,31 +62,62 @@ pub fn build_upstream_url(base_url: &str, suffix: &str) -> AppResult<String> {
     Ok(format!("{prefix}{suffix}"))
 }
 
-/// 注入 auth 头(Authorization 来自 env_key,其他自定义 header 来自 provider.http_headers)
+fn bearer_header_value(raw: &str) -> Option<HeaderValue> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let value = if trimmed.to_ascii_lowercase().starts_with("bearer ") {
+        trimmed.to_string()
+    } else {
+        format!("Bearer {trimmed}")
+    };
+    HeaderValue::from_str(&value).ok()
+}
+
+/// 注入 auth 头(Authorization 来自 env_key 或运行时 direct api_key,其他自定义 header 来自 provider.http_headers)
 pub fn inject_auth_headers(route: &ResolvedRoute, headers: &mut HeaderMap) -> AppResult<()> {
+    let mut authorization_injected = false;
+
     // 1. env_key
     if let Some(env_key) = &route.env_key {
         if !env_key.is_empty() {
             match std::env::var(env_key) {
                 Ok(value) => {
-                    let bearer = format!("Bearer {value}");
-                    if let Ok(v) = HeaderValue::from_str(&bearer) {
+                    if let Some(v) = bearer_header_value(&value) {
                         headers.insert("Authorization", v);
+                        authorization_injected = true;
                     }
                 }
                 Err(_) => {
-                    // env 缺失,记 warn 但不中断(允许 provider 走匿名或自定义 header 鉴权)
                     tracing::warn!(
                         provider = %route.provider_name,
                         env_key = %env_key,
-                        "env var not set; request will likely fail with 401"
+                        "env var not set; no file plaintext api_key fallback will be used"
                     );
                 }
             }
         }
     }
 
-    // 2. provider 自定义 header(http_headers 里)
+    // 2. 运行时 direct api_key。只进内存请求头,不写日志、不回写文件。
+    if !authorization_injected {
+        if let Some(api_key) = &route.api_key {
+            if let Some(v) = bearer_header_value(api_key) {
+                headers.insert("Authorization", v);
+                authorization_injected = true;
+            }
+        }
+    }
+
+    if !authorization_injected {
+        tracing::warn!(
+            provider = %route.provider_name,
+            "no auth credential available; request will likely fail with 401"
+        );
+    }
+
+    // 3. provider 自定义 header(http_headers 里)
     for (k, v) in &route.http_headers {
         if HOP_BY_HOP.contains(&k.to_ascii_lowercase().as_str()) {
             continue;

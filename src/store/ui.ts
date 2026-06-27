@@ -13,30 +13,19 @@ export const clampSidebarWidth = (w: number) =>
   Math.min(SIDEBAR_WIDTH_MAX, Math.max(SIDEBAR_WIDTH_MIN, Math.round(w)));
 
 /**
- * 页面 ID。v0.3 顺序与 ⌘1-7 快捷键一一对应:
- *   1 dashboard · 2 models · 3 provider_routes · 4 codex_runtime
- *   5 profiles · 6 providers · 7 diagnostics · , settings
+ * 页面 ID。默认导航只保留普通用户主线:
+ *   1 dashboard · 2 models · 3 logs · , settings
+ * model_router / codex_runtime 作为高级诊断页面保留,不放入默认侧栏。
  */
 export type PageId =
   | "dashboard"
   | "models"
-  | "provider_routes"
+  | "model_router"
   | "codex_runtime"
-  | "profiles"
-  | "providers"
-  | "diagnostics"
+  | "logs"
   | "settings";
 
-export const PAGE_IDS: PageId[] = [
-  "dashboard",
-  "models",
-  "provider_routes",
-  "codex_runtime",
-  "profiles",
-  "providers",
-  "diagnostics",
-  "settings",
-];
+export const PAGE_IDS: PageId[] = ["dashboard", "models", "logs", "settings"];
 
 interface UIState {
   /** 当前页面 */

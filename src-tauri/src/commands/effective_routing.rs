@@ -5,8 +5,9 @@ use std::path::Path;
 use std::sync::Arc;
 
 const DEFAULT_CONFIG_PATH: &str = ".codex/config.toml";
-const OPENCODEX_CATALOG_PATH: &str = ".opencodex/custom_model_catalog.json";
-const OPENCODEX_PROVIDERS_PATH: &str = ".opencodex/providers.json";
+const CODEX_BOX_CATALOG_PATH: &str = ".codex/codex-box/custom_model_catalog.json";
+const CODEX_BOX_PROVIDERS_PATH: &str = ".codex/codex-box/providers.json";
+const CODEX_BOX_INJECT_MAP_PATH: &str = ".codex/codex-box/inject-map.json";
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -48,6 +49,8 @@ struct CatalogRoute {
 struct UpstreamProvider {
     name: String,
     base_url: Option<String>,
+    api_key_env: Option<String>,
+    plaintext_api_key_present: bool,
 }
 
 #[tauri::command]
@@ -57,12 +60,15 @@ pub fn effective_routing_status(
     let home = dirs::home_dir()
         .ok_or_else(|| AppError::ConfigNotFound("home dir not found".to_string()))?;
     let config_path = home.join(DEFAULT_CONFIG_PATH);
-    let catalog_path = home.join(OPENCODEX_CATALOG_PATH);
-    let providers_path = home.join(OPENCODEX_PROVIDERS_PATH);
+    let catalog_path = home.join(CODEX_BOX_CATALOG_PATH);
+    let providers_path = home.join(CODEX_BOX_PROVIDERS_PATH);
+    let inject_map_path = home.join(CODEX_BOX_INJECT_MAP_PATH);
 
     let config_raw = std::fs::read_to_string(&config_path).map_err(AppError::Io)?;
     let catalog_raw = std::fs::read_to_string(&catalog_path).ok();
     let providers_raw = std::fs::read_to_string(&providers_path).ok();
+    let inject_map_raw = std::fs::read_to_string(&inject_map_path).ok();
+    crate::proxy::lifecycle::reconcile_running_state(state.inner());
     let proxy_view = state.inner().to_view();
     let proxy_running = state.inner().status() == ProxyStatus::Running;
     let proxy_port = if proxy_view.port > 0 {
@@ -76,6 +82,7 @@ pub fn effective_routing_status(
         &config_raw,
         catalog_raw.as_deref(),
         providers_raw.as_deref(),
+        inject_map_raw.as_deref(),
         proxy_running,
         proxy_port,
     )
@@ -86,6 +93,7 @@ fn build_effective_routing_status(
     config_raw: &str,
     catalog_raw: Option<&str>,
     providers_raw: Option<&str>,
+    inject_map_raw: Option<&str>,
     proxy_running: bool,
     proxy_port: Option<u16>,
 ) -> AppResult<EffectiveRoutingStatus> {
@@ -103,7 +111,7 @@ fn build_effective_routing_status(
         issues.push(issue(
             "warn",
             "catalog_not_configured",
-            "未配置 model_catalog_json，Codex App 不会显式加载 ~/.opencodex/custom_model_catalog.json。",
+            "未配置 model_catalog_json，Codex App 不会显式加载 Codex Box 模型目录 ~/.codex/codex-box/custom_model_catalog.json。",
         ));
     }
 
@@ -111,6 +119,14 @@ fn build_effective_routing_status(
         resolve_request_base_url(table, &model_provider, &mut issues);
     if let Some(url) = request_base_url.as_deref() {
         check_local_proxy_url(url, proxy_running, proxy_port, &mut issues);
+    } else {
+        issues.push(issue(
+            "fail",
+            "request_entry_not_configured",
+            format!(
+                "当前 model_provider={model_provider} 没有指向 Codex Box 本地代理的请求入口，Codex App 不会把请求发到 BYOK runtime。"
+            ),
+        ));
     }
 
     let catalog = catalog_raw.map(parse_catalog_routes).unwrap_or_default();
@@ -137,18 +153,26 @@ fn build_effective_routing_status(
     let upstreams = providers_raw
         .map(parse_upstream_providers)
         .unwrap_or_default();
-    let upstream_base_url = backend_provider
+    check_legacy_inject_map(inject_map_raw, &mut issues);
+
+    let upstream_provider = backend_provider
         .as_deref()
-        .and_then(|provider| upstreams.iter().find(|entry| entry.name == provider))
-        .and_then(|entry| entry.base_url.clone());
+        .and_then(|provider| upstreams.iter().find(|entry| entry.name == provider));
+    let upstream_base_url = upstream_provider.and_then(|entry| entry.base_url.clone());
 
     if let Some(provider) = backend_provider.as_deref() {
-        if provider != "openai" && upstream_base_url.is_none() {
-            issues.push(issue(
-                "fail",
-                "backend_provider_missing",
-                format!("backend_provider={provider} 没有在 ~/.opencodex/providers.json 中找到对应上游 API。"),
-            ));
+        if provider != "openai" {
+            if upstream_base_url.is_none() {
+                issues.push(issue(
+                    "fail",
+                    "backend_provider_missing",
+                    format!("backend_provider={provider} 没有在 Codex Box 模型来源 ~/.codex/codex-box/providers.json 中找到对应上游 API。"),
+                ));
+            }
+
+            if let Some(upstream) = upstream_provider {
+                check_upstream_credentials(provider, upstream, &mut issues);
+            }
         }
     }
 
@@ -169,6 +193,90 @@ fn build_effective_routing_status(
         proxy_port,
         issues,
     })
+}
+
+fn check_legacy_inject_map(raw: Option<&str>, issues: &mut Vec<EffectiveRoutingIssue>) {
+    let Some(raw) = raw else {
+        return;
+    };
+    if raw.trim().is_empty() {
+        return;
+    }
+
+    let Ok(map) = serde_json::from_str::<crate::proxy::inject_map::InjectMap>(raw) else {
+        issues.push(issue(
+            "warn",
+            "inject_map_parse_failed",
+            "inject-map.json 解析失败，Codex Box 会忽略该路由缓存；建议重新执行 MultiRouter 同步生成干净状态。",
+        ));
+        return;
+    };
+
+    let legacy_count = map
+        .providers
+        .iter()
+        .filter(|entry| is_legacy_inject_map_entry(entry))
+        .count();
+    if legacy_count == 0 {
+        return;
+    }
+
+    issues.push(issue(
+        "warn",
+        "legacy_inject_map_pending_cleanup",
+        format!(
+            "发现 {legacy_count} 条旧 OpenCodex/8765 inject-map 残留；MultiRouter 同步预览会展示差异，确认后清理，避免 Codex App 继续误打到旧本地端口。"
+        ),
+    ));
+}
+
+fn is_legacy_inject_map_entry(entry: &crate::proxy::inject_map::InjectMapEntry) -> bool {
+    entry.name.trim().eq_ignore_ascii_case("opencodex")
+        || is_legacy_opencodex_url(&entry.original_base_url)
+}
+
+fn is_legacy_opencodex_url(url: &str) -> bool {
+    let normalized = url.trim().to_ascii_lowercase();
+    normalized.contains("127.0.0.1:8765") || normalized.contains("localhost:8765")
+}
+
+fn check_upstream_credentials(
+    provider: &str,
+    upstream: &UpstreamProvider,
+    issues: &mut Vec<EffectiveRoutingIssue>,
+) {
+    if upstream.plaintext_api_key_present {
+        issues.push(issue(
+            "fail",
+            "upstream_api_key_plaintext_ignored",
+            format!(
+                "backend_provider={provider} 的 api_key 是明文。Codex Box 不会使用文件里的明文 key；请改成 ${{ENV_VAR}} / api_key_ref 并把真实 key 放进环境变量。"
+            ),
+        ));
+    }
+
+    if let Some(env_name) = upstream.api_key_env.as_deref() {
+        if std::env::var_os(env_name).is_none() {
+            issues.push(issue(
+                "fail",
+                "upstream_api_key_env_missing",
+                format!(
+                    "backend_provider={provider} 的 api_key 引用 ${env_name}，但当前 Codex Box 进程环境没有该变量。请求已到达本地代理，但上游会返回 401；设置 {env_name} 后重启 Codex Box / Codex App。"
+                ),
+            ));
+        }
+        return;
+    }
+
+    if !upstream.plaintext_api_key_present {
+        issues.push(issue(
+            "fail",
+            "upstream_api_key_missing",
+            format!(
+                "backend_provider={provider} 没有配置 api_key 或 api_key_ref。请求已到达本地代理，但上游不会接受未鉴权请求。"
+            ),
+        ));
+    }
 }
 
 fn string_at(table: &toml::map::Map<String, toml::Value>, key: &str) -> Option<String> {
@@ -282,18 +390,21 @@ fn parse_catalog_routes(raw: &str) -> Vec<CatalogRoute> {
             let model_id = obj
                 .get("model_id")
                 .or_else(|| obj.get("slug"))
+                .or_else(|| obj.get("model"))
                 .and_then(|value| value.as_str())?
                 .to_string();
+            let provider = obj
+                .get("provider")
+                .and_then(|value| value.as_str())
+                .map(normalize_catalog_provider);
+            let backend_provider = obj
+                .get("backend_provider")
+                .and_then(|value| value.as_str())
+                .map(ToString::to_string);
             Some(CatalogRoute {
                 model_id,
-                provider: obj
-                    .get("provider")
-                    .and_then(|value| value.as_str())
-                    .map(ToString::to_string),
-                backend_provider: obj
-                    .get("backend_provider")
-                    .and_then(|value| value.as_str())
-                    .map(ToString::to_string),
+                provider,
+                backend_provider,
                 backend_model: obj
                     .get("backend_model")
                     .or_else(|| obj.get("model"))
@@ -302,6 +413,14 @@ fn parse_catalog_routes(raw: &str) -> Vec<CatalogRoute> {
             })
         })
         .collect()
+}
+
+fn normalize_catalog_provider(provider: &str) -> String {
+    if provider.eq_ignore_ascii_case("opencodex") {
+        "codex_local_access".to_string()
+    } else {
+        provider.to_string()
+    }
 }
 
 fn parse_upstream_providers(raw: &str) -> Vec<UpstreamProvider> {
@@ -325,15 +444,41 @@ fn parse_upstream_providers(raw: &str) -> Vec<UpstreamProvider> {
                 .get("name")
                 .and_then(|value| value.as_str())?
                 .to_string();
+            let api_key = obj.get("api_key").and_then(|value| value.as_str());
+            let api_key_ref = obj.get("api_key_ref").and_then(|value| value.as_str());
+            let api_key_env = api_key_ref
+                .or_else(|| api_key.filter(|value| value.trim_start().starts_with('$')))
+                .map(normalize_env_ref)
+                .filter(|value| !value.is_empty());
+            let plaintext_api_key_present = api_key
+                .map(|value| {
+                    let trimmed = value.trim();
+                    !trimmed.is_empty() && !trimmed.starts_with('$')
+                })
+                .unwrap_or(false);
+
             Some(UpstreamProvider {
                 name,
                 base_url: obj
                     .get("base_url")
                     .and_then(|value| value.as_str())
                     .map(ToString::to_string),
+                api_key_env,
+                plaintext_api_key_present,
             })
         })
         .collect()
+}
+
+fn normalize_env_ref(value: &str) -> String {
+    let trimmed = value.trim();
+    if let Some(inner) = trimmed
+        .strip_prefix("${")
+        .and_then(|value| value.strip_suffix('}'))
+    {
+        return inner.trim().to_string();
+    }
+    trimmed.trim_start_matches('$').to_string()
 }
 
 fn issue(
@@ -362,6 +507,7 @@ model_provider = "openai"
 "#,
             None,
             None,
+            None,
             false,
             None,
         )
@@ -385,9 +531,10 @@ model_catalog_json = "/tmp/models.json"
 
 [model_providers.opencodex]
 base_url = "http://127.0.0.1:0/v1"
-"#,
+            "#,
             Some(r#"{"models":[]}"#),
             Some(r#"{"providers":[]}"#),
+            None,
             true,
             Some(1455),
         )
@@ -400,7 +547,7 @@ base_url = "http://127.0.0.1:0/v1"
     }
 
     #[test]
-    fn status_resolves_backend_provider_to_upstream() {
+    fn status_resolves_catalog_entries_that_use_model_field() {
         let status = build_effective_routing_status(
             Path::new("/tmp/config.toml"),
             r#"
@@ -412,24 +559,172 @@ model_catalog_json = "/tmp/models.json"
 base_url = "http://127.0.0.1:1455/v1"
 "#,
             Some(
-                r#"{"models":[{"slug":"minimax","provider":"opencodex","backend_provider":"minimax","backend_model":"MiniMax-M3"}]}"#,
+                r#"{"models":[{"model":"minimax","provider":"opencodex","backend_provider":"minimax","backend_model":"MiniMax-M3"}]}"#,
             ),
             Some(
                 r#"{"providers":[{"name":"minimax","base_url":"https://api.minimaxi.com/v1"}]}"#,
             ),
+            None,
             true,
             Some(1455),
         )
         .unwrap();
 
         assert!(status.catalog_model_found);
-        assert_eq!(status.catalog_provider.as_deref(), Some("opencodex"));
+        assert_eq!(
+            status.catalog_provider.as_deref(),
+            Some("codex_local_access")
+        );
         assert_eq!(status.backend_provider.as_deref(), Some("minimax"));
-        assert_eq!(status.backend_model.as_deref(), Some("MiniMax-M3"));
         assert_eq!(
             status.upstream_base_url.as_deref(),
             Some("https://api.minimaxi.com/v1")
         );
-        assert!(status.issues.is_empty());
+    }
+
+    #[test]
+    fn status_reports_missing_upstream_env_key() {
+        let status = build_effective_routing_status(
+            Path::new("/tmp/config.toml"),
+            r#"
+model = "minimax"
+model_provider = "openai"
+model_catalog_json = "/tmp/models.json"
+openai_base_url = "http://127.0.0.1:1455/v1"
+"#,
+            Some(
+                r#"{"models":[{"model":"minimax","provider":"openai","backend_provider":"minimax","backend_model":"MiniMax-M3"}]}"#,
+            ),
+            Some(
+                r#"{"providers":[{"name":"minimax","base_url":"https://api.minimaxi.com/v1","api_key":"$CODEX_BOX_TEST_MISSING_MINIMAX_API_KEY_7F32F3A4"}]}"#,
+            ),
+            None,
+            true,
+            Some(1455),
+        )
+        .unwrap();
+
+        assert!(status
+            .issues
+            .iter()
+            .any(|issue| issue.code == "upstream_api_key_env_missing"));
+    }
+
+    #[test]
+    fn status_accepts_braced_env_ref_when_env_is_present() {
+        std::env::set_var(
+            "CODEX_BOX_TEST_PRESENT_MINIMAX_API_KEY_134B6E2C",
+            "test-key",
+        );
+        let status = build_effective_routing_status(
+            Path::new("/tmp/config.toml"),
+            r#"
+model = "minimax"
+model_provider = "openai"
+model_catalog_json = "/tmp/models.json"
+openai_base_url = "http://127.0.0.1:1455/v1"
+"#,
+            Some(
+                r#"{"models":[{"model":"minimax","provider":"openai","backend_provider":"minimax","backend_model":"MiniMax-M3"}]}"#,
+            ),
+            Some(
+                r#"{"providers":[{"name":"minimax","base_url":"https://api.minimaxi.com/v1","api_key":"${CODEX_BOX_TEST_PRESENT_MINIMAX_API_KEY_134B6E2C}"}]}"#,
+            ),
+            None,
+            true,
+            Some(1455),
+        )
+        .unwrap();
+        std::env::remove_var("CODEX_BOX_TEST_PRESENT_MINIMAX_API_KEY_134B6E2C");
+
+        assert!(!status
+            .issues
+            .iter()
+            .any(|issue| issue.code == "upstream_api_key_env_missing"));
+    }
+
+    #[test]
+    fn status_reports_plaintext_upstream_key_as_ignored() {
+        let status = build_effective_routing_status(
+            Path::new("/tmp/config.toml"),
+            r#"
+model = "minimax"
+model_provider = "openai"
+model_catalog_json = "/tmp/models.json"
+openai_base_url = "http://127.0.0.1:1455/v1"
+"#,
+            Some(
+                r#"{"models":[{"model":"minimax","provider":"openai","backend_provider":"minimax","backend_model":"MiniMax-M3"}]}"#,
+            ),
+            Some(
+                r#"{"providers":[{"name":"minimax","base_url":"https://api.minimaxi.com/v1","api_key":"sk-plaintext"}]}"#,
+            ),
+            None,
+            true,
+            Some(1455),
+        )
+        .unwrap();
+
+        assert!(status.issues.iter().any(|issue| {
+            issue.severity == "fail" && issue.code == "upstream_api_key_plaintext_ignored"
+        }));
+        assert!(!status
+            .issues
+            .iter()
+            .any(|issue| issue.code == "upstream_api_key_missing"));
+    }
+
+    #[test]
+    fn status_reports_missing_request_entry() {
+        let status = build_effective_routing_status(
+            Path::new("/tmp/config.toml"),
+            r#"
+model = "gpt-5.5"
+model_provider = "openai"
+model_catalog_json = "/tmp/models.json"
+            "#,
+            Some(r#"{"models":[{"model":"gpt-5.5","provider":"openai","backend_provider":"openai"}]}"#),
+            Some(r#"{"providers":[]}"#),
+            None,
+            true,
+            Some(1455),
+        )
+        .unwrap();
+
+        assert!(status
+            .issues
+            .iter()
+            .any(|issue| issue.code == "request_entry_not_configured"));
+    }
+
+    #[test]
+    fn status_warns_about_legacy_opencodex_inject_map() {
+        let status = build_effective_routing_status(
+            Path::new("/tmp/config.toml"),
+            r#"
+model = "minimax-m3"
+model_provider = "codex_local_access"
+model_catalog_json = "/tmp/models.json"
+
+[model_providers.codex_local_access]
+base_url = "http://127.0.0.1:1455/v1"
+"#,
+            Some(
+                r#"{"models":[{"model":"minimax-m3","provider":"codex_local_access","backend_provider":"minimax","backend_model":"MiniMax-M3"}]}"#,
+            ),
+            Some(
+                r#"{"providers":[{"name":"minimax","base_url":"https://api.minimaxi.com/v1","api_key":"sk-test"}]}"#,
+            ),
+            Some(
+                r#"{"providers":[{"name":"opencodex","originalBaseUrl":"http://127.0.0.1:8765/v1","wireApi":"responses","models":["gpt-5.5"]}]}"#,
+            ),
+            true,
+            Some(1455),
+        )
+        .unwrap();
+
+        assert!(status.issues.iter().any(|issue| {
+            issue.severity == "warn" && issue.code == "legacy_inject_map_pending_cleanup"
+        }));
     }
 }

@@ -30,7 +30,7 @@
 - 想在 Codex App 模型下拉里同时管理订阅、官方 API、第三方 API(含国产)、本地 gateway 的用户
 - 想用统一 `~/.codex/config.toml` 视角管理多 profile、多 provider 的用户
 - 需要安全修改 `~/.codex/config.toml` 的用户
-- 同时使用 AITabby/opencodex CLI 与 Codex Box 的用户(共享 `~/.opencodex/*.json` 路径约定)
+- 同时使用 AITabby/opencodex、Codex++、CC Switch、Cockpit Tools 与 Codex Box 的用户(支持只读扫描与一键导入)
 
 ---
 
@@ -38,10 +38,10 @@
 
 v0.3 的 MVP 跑通四条主路径:
 
-1. **看得清**:Dashboard 结构化展示 Codex config 状态、active profile、provider 列表(订阅 / 官方 / 第三方 / 本地)、`~/.opencodex/` 自有配置、Codex Desktop 安装情况。
-2. **改得稳**:所有 `~/.codex/config.toml` 与 `~/.opencodex/*.json` 写入走 backup → diff → confirm → atomic write → rollback,secret 走 env 引用,绝不写日志。
+1. **看得清**:Dashboard 结构化展示 Codex config 状态、active profile、provider 列表(订阅 / 官方 / 第三方 / 本地)、Codex Box 主配置、Codex Desktop 安装情况。
+2. **改得稳**:所有 `~/.codex/config.toml` 与 `~/.codex/codex-box/*.json` 写入走 backup → diff → confirm → atomic write → rollback,secret 走 env 引用,绝不写日志。
 3. **加得动**:用户能在 UI 里新增 / 删除 / 启用 / 禁用 provider,新增 / 删除 / 切换 model,新增 / 删除 profile;每条改动都立即可回滚。
-4. **查得快**:Diagnostics 能检查 config 语法、Codex Desktop 安装、`~/.opencodex/*.json` 完整性、provider URL 可达性、env 变量是否存在。
+4. **查得快**:Diagnostics 能检查 config 语法、Codex Desktop 安装、Codex Box 模型目录完整性、第三方导入来源、provider URL 可达性、env 变量是否存在。
 
 ---
 
@@ -56,17 +56,17 @@ v0.3 的 MVP 跑通四条主路径:
 
 ### 4.2 Provider Routes(多 provider 路由)
 
-- 维护 `~/.opencodex/providers.json`(AITabby 约定)
+- 维护 `~/.codex/codex-box/providers.json`(Codex Box 主配置)
 - 支持:
   - 官方订阅(`codex-subscription`):只做状态识别,绝不读 token
   - 官方 API(`openai-official-api`):`https://api.openai.com/v1` + `OPENAI_API_KEY`
   - OpenAI-compatible(`compatible-api`):任意 base_url + wire_api + env 引用 key
   - 本地 gateway(`local-gateway`):Codex Box 自有 runtime 或用户显式配置 endpoint
-- "新增 provider"会写 `~/.opencodex/providers.json` + 在 `~/.codex/config.toml` 的 `[model_providers.*]` 段加表
+- "新增 provider"会写 `~/.codex/codex-box/providers.json` + 在 `~/.codex/config.toml` 的 `[model_providers.*]` 段加表
 
 ### 4.3 Custom Model Catalog(自定义模型目录)
 
-- 维护 `~/.opencodex/custom_model_catalog.json`(AITabby 约定)
+- 维护 `~/.codex/codex-box/custom_model_catalog.json`(Codex Box 主模型目录)
 - 用户在 Codex Box 里"加模型"会落在这份 JSON
 - 拼装进 `~/.codex/config.toml` 的 `[model_providers.*].models` 字段
 
@@ -98,7 +98,7 @@ v0.3 的 MVP 跑通四条主路径:
 
 - Config 语法检查
 - Codex Desktop 安装检测(只读)
-- `~/.opencodex/*.json` 完整性
+- `~/.codex/codex-box/*.json` 完整性与 `~/.opencodex/*.json` 兼容导入检测
 - provider URL 可达性
 - env 变量存在性
 - 输出可复制的脱敏诊断报告
@@ -110,6 +110,7 @@ v0.3 的 MVP 跑通四条主路径:
 - secret 脱敏(默认开启)
 - 备份保留策略
 - 日志大小和保留策略
+- 第三方配置导入(OpenCodex / Codex++ / CC Switch / Cockpit Tools / Codex 备份)
 - 实验功能开关
 
 ---
@@ -160,8 +161,8 @@ v0.3 的 MVP 跑通四条主路径:
 - `CodexProfile`
 - `ModelProvider`
 - `ModelCatalogEntry`(自定义模型目录条目)
-- `ProviderRoute`(`~/.opencodex/providers.json` 条目)
-- `OpenCodexCustomConfig`(`~/.opencodex/custom_model_catalog.json` 完整快照)
+- `ProviderRoute`(`~/.codex/codex-box/providers.json` 条目)
+- `CodexBoxCustomConfig`(`~/.codex/codex-box/custom_model_catalog.json` 完整快照)
 - `CodexRuntimeStatus`
 - `BackupRecord`
 - `HealthStatus`
@@ -179,7 +180,7 @@ v0.3 的 MVP 跑通四条主路径:
 - UI:`Tailwind CSS + shadcn/ui`
 - Backend:`Rust`
 - Config 解析:`toml` crate + 自写保格式层
-- JSON 解析:`serde_json`(用于 `~/.opencodex/*.json`)
+- JSON 解析:`serde_json`(用于 `~/.codex/codex-box/*.json` 与第三方导入来源)
 - Diff:结构化 diff + 文本 diff(`similar` crate)
 - 写入策略:backup first + diff confirm + atomic write + rollback
 - State:`zustand` + `@tanstack/react-query`
@@ -214,9 +215,11 @@ v0.3 的 MVP 跑通四条主路径:
 - 不上传任何用户配置
 - 不复制 AITabby/opencodex 源码、UI、长段文案
 
-### AITabby/opencodex 兼容边界
+### 第三方配置兼容边界
 
-- Codex Box 复用 AITabby/opencodex 在 `~/.opencodex/*.json` 的路径与字段约定,允许用户同时使用 AITabby CLI 与 Codex Box。
+- Codex Box 使用 `~/.codex/codex-box/*.json` 作为主写入目录。
+- `~/.opencodex/*.json` 仅作为 AITabby/opencodex 只读扫描与一键导入来源,不参与 Codex Box 实时模型列表、代理路由或 API 服务链路兜底。
+- Codex++、CC Switch、Cockpit Tools 作为只读扫描和导入来源,不依赖其内部私有数据库格式。
 - Codex Box 不 spawn AITabby/opencodex 进程,不复用其源码,实现完全独立。
 - 详细事实见 [docs/references/aitabby-opencodex.md](./docs/references/aitabby-opencodex.md)。
 
@@ -227,7 +230,8 @@ v0.3 的 MVP 跑通四条主路径:
 - 写入必须 atomic write(写 `.tmp` → `rename`)
 - 写入失败必须 rollback 到最近一次 backup
 - 并发写入必须校验 `content_hash`
-- 任何 `~/.opencodex/*.json` 写入走相同闭环
+- 任何 `~/.codex/codex-box/*.json` 写入走相同闭环
+- 任何第三方目录导入默认只读扫描,写入目标只能是 Codex Box 主目录
 
 ### 隐私红线
 
