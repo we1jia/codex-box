@@ -4,7 +4,15 @@
 
 Codex Box 使用 `Tauri + React + TypeScript + Tailwind + Rust` 构建。它尝试通过安全管理 `~/.codex/config.toml` 与 `~/.codex/codex-box/` 下的本地配置，让 Codex Desktop / Codex CLI 在同一套本地工作流里看到官方订阅、OpenAI 官方 API、第三方 OpenAI-compatible API 和本地 gateway。
 
-![Codex Box 真实运行截图](./docs/assets/codex-box-real-preview.png)
+## 界面预览
+
+### 总览
+
+![Codex Box 总览界面](./docs/assets/codex-box-overview-preview.png)
+
+### 模型配置
+
+![Codex Box 模型配置界面](./docs/assets/codex-box-models-preview.png)
 
 ## 项目定位
 
